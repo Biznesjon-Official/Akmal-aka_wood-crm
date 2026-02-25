@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider, Spin } from 'antd';
 import { CartProvider } from './context/CartContext';
 import AppLayout from './components/AppLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Wagons = lazy(() => import('./pages/Wagons'));
@@ -30,6 +31,7 @@ const queryClient = new QueryClient({
 
 export default function App() {
   return (
+    <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <CartProvider>
         <ConfigProvider>
@@ -54,5 +56,6 @@ export default function App() {
         </ConfigProvider>
       </CartProvider>
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

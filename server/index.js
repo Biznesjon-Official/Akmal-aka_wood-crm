@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -6,13 +7,17 @@ const compression = require('compression');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
+
+// Trust proxy (nginx orqasida)
+app.set('trust proxy', 1);
+
 app.use(compression());
 app.use(cors({
   origin: process.env.CLIENT_URL || (process.env.NODE_ENV === 'production'
     ? 'https://akmalaka.biznesjon.uz'
     : 'http://localhost:3010'),
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/wagons', require('./routes/wagons'));
@@ -25,6 +30,15 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/expense-sources', require('./routes/expenseSources'));
 app.use('/api/my-debts', require('./routes/myDebts'));
+
+// Production: serve client build
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 
