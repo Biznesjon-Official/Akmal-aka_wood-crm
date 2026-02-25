@@ -8,7 +8,9 @@ const errorHandler = require('./middleware/errorHandler');
 const app = express();
 app.use(compression());
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || (process.env.NODE_ENV === 'production'
+    ? 'https://akmalaka.biznesjon.uz'
+    : 'http://localhost:3010'),
 }));
 app.use(express.json());
 
@@ -26,7 +28,7 @@ app.use('/api/my-debts', require('./routes/myDebts'));
 
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5010;
 
 let server;
 mongoose.connect(process.env.MONGODB_URI)

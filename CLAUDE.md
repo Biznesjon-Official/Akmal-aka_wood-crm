@@ -4,7 +4,9 @@ Yog'och import-savdo biznesini boshqarish tizimi. Vagon, xarajat, sotuv, qarz, k
 ## Texnologiyalar
 - **Frontend**: React 19 + Vite 7 + Ant Design 6 + React Query 5 + React Router 7 + Axios + Dayjs
 - **Backend**: Express 4 + Mongoose 8 + MongoDB Atlas
-- **Dev**: `npm run dev` (concurrently server:5000 + client:3000)
+- **Dev**: `npm run dev` (concurrently server:5010 + client:3010)
+- **Deploy**: PM2 (`ecosystem.config.js`) + Nginx (`nginx-akmalaka.conf`)
+- **Domain**: akmalaka.biznesjon.uz
 
 ## Struktura
 ```
