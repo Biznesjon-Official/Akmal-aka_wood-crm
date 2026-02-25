@@ -1,0 +1,58 @@
+import { lazy, Suspense } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ConfigProvider, Spin } from 'antd';
+import { CartProvider } from './context/CartContext';
+import AppLayout from './components/AppLayout';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Wagons = lazy(() => import('./pages/Wagons'));
+const WagonDetail = lazy(() => import('./pages/Wagons/WagonDetail'));
+const Warehouse = lazy(() => import('./pages/Warehouse'));
+const Sales = lazy(() => import('./pages/Sales'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Debts = lazy(() => import('./pages/Debts'));
+const Cash = lazy(() => import('./pages/Cash'));
+const Transfers = lazy(() => import('./pages/Transfers'));
+
+const PageLoader = <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <CartProvider>
+        <ConfigProvider>
+          <BrowserRouter>
+          <Suspense fallback={PageLoader}>
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/wagons" element={<Wagons />} />
+              <Route path="/wagons/:id" element={<WagonDetail />} />
+              <Route path="/warehouse" element={<Warehouse />} />
+              <Route path="/sales" element={<Sales />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/debts" element={<Debts />} />
+              <Route path="/cash" element={<Cash />} />
+              <Route path="/transfers" element={<Transfers />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Route>
+          </Routes>
+          </Suspense>
+          </BrowserRouter>
+        </ConfigProvider>
+      </CartProvider>
+    </QueryClientProvider>
+  );
+}

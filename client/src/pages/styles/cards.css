@@ -1,0 +1,288 @@
+/* ===================== WAGON CARD ===================== */
+.wagon-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f0f0f0;
+  height: 100%;
+}
+
+.wagon-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  border-color: #d9d9d9;
+}
+
+.wagon-card .ant-card-body {
+  padding: 0 !important;
+}
+
+.wagon-card-header {
+  padding: 14px 16px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.wagon-card-code {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  color: #1a1a2e;
+}
+
+.wagon-card-route {
+  padding: 0 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #666;
+  font-size: 13px;
+}
+
+.wagon-card-route .anticon {
+  color: #1677ff;
+  font-size: 12px;
+}
+
+.wagon-card-dates {
+  padding: 0 16px 12px;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #999;
+}
+
+.wagon-card-dates .anticon {
+  margin-right: 4px;
+  font-size: 11px;
+}
+
+.wagon-card-stats {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  background: linear-gradient(135deg, #f8f9fe 0%, #f0f5ff 100%);
+  border-top: 1px solid #f0f0f0;
+}
+
+.wagon-card-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wagon-card-stat-label {
+  font-size: 11px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wagon-card-stat-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.wagon-card-stat-value.primary {
+  color: #1677ff;
+}
+
+.wagon-card-bundles {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  background: #f0f5ff;
+  border: 1px solid #d6e4ff;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #1677ff;
+  font-weight: 600;
+}
+
+/* Status indicator strip at top */
+.wagon-card-status-strip {
+  height: 4px;
+  width: 100%;
+}
+
+.wagon-card-status-strip.kelyapti {
+  background: linear-gradient(90deg, #faad14, #ffc53d);
+}
+
+.wagon-card-status-strip.faol {
+  background: linear-gradient(90deg, #52c41a, #73d13d);
+}
+
+.wagon-card-status-strip.sotildi {
+  background: linear-gradient(90deg, #1677ff, #4096ff);
+}
+
+.wagon-card-status-strip.omborda {
+  background: linear-gradient(90deg, #8c8c8c, #bfbfbf);
+}
+
+/* Sell button */
+.wagon-card-sell {
+  padding: 10px 16px 14px;
+}
+
+.wagon-card-sell .ant-btn {
+  border-radius: 8px;
+  font-weight: 600;
+  height: 36px;
+}
+
+/* ===================== WAREHOUSE CARD ===================== */
+.warehouse-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f0f0f0;
+  height: 100%;
+}
+
+.warehouse-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-color: #d9d9d9;
+}
+
+.warehouse-card .ant-card-body {
+  padding: 0 !important;
+}
+
+.warehouse-card-top {
+  padding: 14px 16px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.warehouse-card-dimension {
+  padding: 8px 16px 12px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #1a1a2e;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+}
+
+.warehouse-card-dimension span {
+  color: #bfbfbf;
+  font-weight: 400;
+  margin: 0 2px;
+}
+
+.warehouse-card-info {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.warehouse-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.warehouse-card-progress {
+  padding: 0 16px 4px;
+}
+
+.warehouse-card-footer {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(135deg, #f8f9fe 0%, #f0f5ff 100%);
+  border-top: 1px solid #f0f0f0;
+}
+
+.warehouse-card-m3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1677ff;
+}
+
+.warehouse-card-tannarx {
+  font-size: 13px;
+  font-weight: 600;
+  color: #52c41a;
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
+.warehouse-card-deductions {
+  padding: 8px 16px 0;
+  border-top: 1px dashed #f0f0f0;
+  margin-top: 4px;
+}
+
+.warehouse-card-deduction-item {
+  font-size: 12px;
+  color: #ff4d4f;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+/* Warehouse sell button */
+.warehouse-card-sell {
+  padding: 10px 16px 14px;
+}
+
+.warehouse-card-sell .ant-btn {
+  border-radius: 8px;
+  font-weight: 600;
+  height: 36px;
+}
+
+/* ===================== SUMMARY FOOTER ===================== */
+.summary-card {
+  border-radius: 12px;
+  margin-top: 16px;
+  background: linear-gradient(135deg, #f6ffed 0%, #e6fffb 100%);
+  border: 1px solid #b7eb8f;
+}
+
+.summary-card .ant-card-body {
+  padding: 16px 24px !important;
+}
+
+.summary-stats {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.summary-stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.summary-stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.summary-stat-value.highlight {
+  color: #1677ff;
+  font-size: 24px;
+}
