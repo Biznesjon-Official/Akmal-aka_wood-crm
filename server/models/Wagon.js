@@ -34,6 +34,7 @@ woodBundleSchema.pre('validate', function () {
 });
 
 const wagonSchema = new mongoose.Schema({
+  type: { type: String, enum: ['vagon', 'mashina'], default: 'vagon' },
   wagonCode: { type: String, required: true },
   status: {
     type: String,

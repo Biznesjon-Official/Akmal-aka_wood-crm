@@ -6,7 +6,7 @@ import {
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, MinusCircleOutlined, InboxOutlined, AppstoreOutlined, BarsOutlined,
-  ArrowRightOutlined, CalendarOutlined, SendOutlined, EnvironmentOutlined, ShoppingCartOutlined,
+  ArrowRightOutlined, CalendarOutlined, SendOutlined, EnvironmentOutlined, ShoppingCartOutlined, CarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse } from '../../api';
@@ -127,7 +127,8 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
 }
 
 // ===================== CREATE MODAL =====================
-function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
+function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon' }) {
+  const isMashina = transportType === 'mashina';
   const [wagonCode, setWagonCode] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
@@ -143,7 +144,8 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
 
   const handleOk = () => {
     const errs = {};
-    if (!wagonCode || wagonCode.length !== 9) errs.wagonCode = true;
+    if (!isMashina && (!wagonCode || wagonCode.length !== 9)) errs.wagonCode = true;
+    if (isMashina && !wagonCode) errs.wagonCode = true;
     if (!origin) errs.origin = true;
     if (!destination) errs.destination = true;
     if (Object.keys(errs).length) {
@@ -152,6 +154,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
       return;
     }
     onSave({
+      type: transportType,
       wagonCode, origin, destination,
       sentDate: sentDate?.toISOString() || null,
       arrivedDate: arrivedDate?.toISOString() || null,
@@ -168,7 +171,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
   };
 
   return (
-    <Modal title="Yangi vagon" open={open} onCancel={onCancel} onOk={handleOk}
+    <Modal title={isMashina ? 'Yangi mashina' : 'Yangi vagon'} open={open} onCancel={onCancel} onOk={handleOk}
       confirmLoading={loading} afterClose={handleAfterClose} width={700}
       okText="Yaratish" cancelText="Bekor qilish">
 
@@ -176,12 +179,18 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <tbody>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ ...labelS, width: 160 }}>Vagon kodi <span style={{ color: '#ff4d4f' }}>*</span></td>
+            <td style={{ ...labelS, width: 160 }}>{isMashina ? 'Mashina raqami' : 'Vagon kodi'} <span style={{ color: '#ff4d4f' }}>*</span></td>
             <td style={cellS}>
-              <Input size="small" value={wagonCode}
-                onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 9); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
-                status={errors.wagonCode ? 'error' : undefined} placeholder="9 ta raqam"
-                maxLength={9} suffix={<Text type="secondary">{wagonCode.length}/9</Text>} />
+              {isMashina ? (
+                <Input size="small" value={wagonCode}
+                  onChange={(e) => { const v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
+                  status={errors.wagonCode ? 'error' : undefined} placeholder="Mashina raqami" />
+              ) : (
+                <Input size="small" value={wagonCode}
+                  onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 9); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
+                  status={errors.wagonCode ? 'error' : undefined} placeholder="9 ta raqam"
+                  maxLength={9} suffix={<Text type="secondary">{wagonCode.length}/9</Text>} />
+              )}
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
@@ -212,17 +221,6 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
           </tr>
         </tbody>
       </table>
-
-      {/* Expenses */}
-      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
-      <ExpensesEditor
-        fixed={fixed} wood={wood} custom={custom}
-        onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-        onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
-        onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
-        onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
-        onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
-      />
 
       {/* Wood bundles */}
       <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Yog'ochlar</Divider>
@@ -257,6 +255,17 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate }) {
         onClick={() => setBundles((p) => [...p, { thickness: null, width: null, length: null, count: null }])}>
         Yog'och qo'shish
       </Button>
+
+      {/* Expenses */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
+      <ExpensesEditor
+        fixed={fixed} wood={wood} custom={custom}
+        onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
+        onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
+        onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
+        onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
+        onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
+      />
 
       {/* Tannarx real-time preview */}
       {(() => {
@@ -382,7 +391,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
   const totalExpUsd = usdExp + rubInUsd;
 
   return (
-    <Modal title={`Vagon: ${wagon.wagonCode}`} open={open} onCancel={() => { setEditMode(false); onClose(); }} width={800}
+    <Modal title={`${wagon.type === 'mashina' ? 'Mashina' : 'Vagon'}: ${wagon.wagonCode}`} open={open} onCancel={() => { setEditMode(false); onClose(); }} width={800}
       footer={editMode ? [
         <Button key="cancel" onClick={() => setEditMode(false)}>Bekor qilish</Button>,
         <Button key="save" type="primary" loading={updating} onClick={handleSave}>Saqlash</Button>,
@@ -397,7 +406,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
         <>
           {/* View mode */}
           <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
-            <Descriptions.Item label="Vagon kodi">{wagon.wagonCode}</Descriptions.Item>
+            <Descriptions.Item label={wagon.type === 'mashina' ? 'Mashina raqami' : 'Vagon kodi'}>{wagon.wagonCode}</Descriptions.Item>
             <Descriptions.Item label="Status"><Tag color={statusColors[wagon.status]}>{statusLabels[wagon.status]}</Tag></Descriptions.Item>
             <Descriptions.Item label="Jo'natilgan sana">{formatDate(wagon.sentDate)}</Descriptions.Item>
             <Descriptions.Item label="Kelgan sana">{formatDate(wagon.arrivedDate)}</Descriptions.Item>
@@ -406,6 +415,42 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             <Descriptions.Item label="Kurs (RUB/USD)">{rate || '-'}</Descriptions.Item>
             <Descriptions.Item label="Jami m³">{formatM3(totalM3)}</Descriptions.Item>
           </Descriptions>
+
+          {/* Wood bundles view */}
+          <Divider titlePlacement="left" style={{ margin: '8px 0' }}>Yog'ochlar</Divider>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thS}>Qalinlik (mm)</th><th style={thS}>Eni (mm)</th><th style={thS}>Uzunlik (m)</th>
+                <th style={thS}>Soni</th><th style={thS}>Qoldiq</th><th style={thS}>m³/dona</th>
+                <th style={thS}>Jami m³</th><th style={thS}>Ayirmalar</th><th style={thS}>Amal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(wagon.woodBundles || []).map((b, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={cellS}>{b.thickness}mm</td><td style={cellS}>{b.width}mm</td><td style={cellS}>{b.length}m</td>
+                  <td style={cellS}>{b.count}</td>
+                  <td style={cellS}><Text type={b.remainingCount < b.count ? 'warning' : undefined}>{b.remainingCount}</Text></td>
+                  <td style={cellS}>{formatM3(b.m3PerPiece)}</td><td style={cellS}>{formatM3(b.totalM3)}</td>
+                  <td style={cellS}>
+                    {(b.deductions || []).map((d, di) => <div key={di}><Text type="danger">-{d.count}: {d.reason}</Text></div>)}
+                  </td>
+                  <td style={cellS}>
+                    <Button size="small" type="link" danger onClick={() => openDeduction(i)}>Ayirish</Button>
+                  </td>
+                </tr>
+              ))}
+              {(wagon.woodBundles || []).length === 0 && <tr><td colSpan={9} style={{ ...cellS, color: '#999' }}>Yog'och kiritilmagan</td></tr>}
+            </tbody>
+          </table>
+          {(wagon.woodBundles || []).some(b => b.location === 'vagon') && (
+            <Popconfirm title="Barcha yog'ochlarni omborga o'tkazishni tasdiqlaysizmi?" onConfirm={() => onWarehouse(wagon._id)}>
+              <Button type="primary" icon={<InboxOutlined />} loading={warehouseLoading} style={{ marginTop: 8 }}>
+                Barchasini omborga o'tkazish
+              </Button>
+            </Popconfirm>
+          )}
 
           {/* Expenses view */}
           <Divider titlePlacement="left" style={{ margin: '8px 0' }}>Xarajatlar</Divider>
@@ -440,42 +485,6 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
               </Text>
             </Descriptions.Item>
           </Descriptions>
-
-          {/* Wood bundles view */}
-          <Divider titlePlacement="left" style={{ margin: '8px 0' }}>Yog'ochlar</Divider>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={thS}>Qalinlik (mm)</th><th style={thS}>Eni (mm)</th><th style={thS}>Uzunlik (m)</th>
-                <th style={thS}>Soni</th><th style={thS}>Qoldiq</th><th style={thS}>m³/dona</th>
-                <th style={thS}>Jami m³</th><th style={thS}>Ayirmalar</th><th style={thS}>Amal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(wagon.woodBundles || []).map((b, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={cellS}>{b.thickness}</td><td style={cellS}>{b.width}</td><td style={cellS}>{b.length}</td>
-                  <td style={cellS}>{b.count}</td>
-                  <td style={cellS}><Text type={b.remainingCount < b.count ? 'warning' : undefined}>{b.remainingCount}</Text></td>
-                  <td style={cellS}>{formatM3(b.m3PerPiece)}</td><td style={cellS}>{formatM3(b.totalM3)}</td>
-                  <td style={cellS}>
-                    {(b.deductions || []).map((d, di) => <div key={di}><Text type="danger">-{d.count}: {d.reason}</Text></div>)}
-                  </td>
-                  <td style={cellS}>
-                    <Button size="small" type="link" danger onClick={() => openDeduction(i)}>Ayirish</Button>
-                  </td>
-                </tr>
-              ))}
-              {(wagon.woodBundles || []).length === 0 && <tr><td colSpan={9} style={{ ...cellS, color: '#999' }}>Yog'och kiritilmagan</td></tr>}
-            </tbody>
-          </table>
-          {(wagon.woodBundles || []).some(b => b.location === 'vagon') && (
-            <Popconfirm title="Barcha yog'ochlarni omborga o'tkazishni tasdiqlaysizmi?" onConfirm={() => onWarehouse(wagon._id)}>
-              <Button type="primary" icon={<InboxOutlined />} loading={warehouseLoading} style={{ marginTop: 8 }}>
-                Barchasini omborga o'tkazish
-              </Button>
-            </Popconfirm>
-          )}
         </>
       ) : (
         <>
@@ -483,8 +492,12 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
             <tbody>
               {[
-                ['Vagon kodi', <Input size="small" value={formData.wagonCode} maxLength={9}
-                  onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/\D/g, '').slice(0, 9) }))} />],
+                [wagon.type === 'mashina' ? 'Mashina raqami' : 'Vagon kodi',
+                  wagon.type === 'mashina'
+                    ? <Input size="small" value={formData.wagonCode}
+                        onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase() }))} />
+                    : <Input size="small" value={formData.wagonCode} maxLength={9}
+                        onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/\D/g, '').slice(0, 9) }))} />],
                 ["Jo'natilgan sana", <DatePicker size="small" style={{ width: '100%' }} value={formData.sentDate ? dayjs(formData.sentDate) : null}
                   onChange={(d) => setFormData((p) => ({ ...p, sentDate: d?.toISOString() || null }))} />],
                 ['Kelgan sana', <DatePicker size="small" style={{ width: '100%' }} value={formData.arrivedDate ? dayjs(formData.arrivedDate) : null}
@@ -501,17 +514,6 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
               ))}
             </tbody>
           </table>
-
-          {/* Edit expenses */}
-          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
-          <ExpensesEditor
-            fixed={fixed} wood={wood} custom={custom}
-            onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-            onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
-            onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
-            onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
-            onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
-          />
 
           {/* Edit bundles */}
           <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Yog'ochlar</Divider>
@@ -549,6 +551,17 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             onClick={() => setBundles((p) => [...p, { thickness: null, width: null, length: null, count: null, deductions: [] }])}>
             Yog'och qo'shish
           </Button>
+
+          {/* Edit expenses */}
+          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
+          <ExpensesEditor
+            fixed={fixed} wood={wood} custom={custom}
+            onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
+            onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
+            onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
+            onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
+            onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
+          />
 
           {/* Edit mode tannarx preview */}
           {(() => {
@@ -632,7 +645,10 @@ function WagonCard({ wagon, onClick, isArchive, onSell }) {
       <div className={`wagon-card-status-strip ${status}`} />
       <div className="wagon-card-header">
         <div>
-          <div className="wagon-card-code">{wagon.wagonCode}</div>
+          <div className="wagon-card-code">
+            {wagon.type === 'mashina' && <Tag color="blue" style={{ marginRight: 4, fontSize: 10 }}>Mashina</Tag>}
+            {wagon.wagonCode}
+          </div>
         </div>
         {isArchive
           ? <Tag>Bo'sh</Tag>
@@ -707,7 +723,7 @@ function BundleSellModal({ wagon, open, onClose }) {
   };
 
   return (
-    <Modal title={`Sotish — Vagon ${wagon?.wagonCode || ''}`} open={open} onCancel={handleClose}
+    <Modal title={`Sotish — ${wagon?.type === 'mashina' ? 'Mashina' : 'Vagon'} ${wagon?.wagonCode || ''}`} open={open} onCancel={handleClose}
       footer={<Button onClick={handleClose}>Yopish</Button>} width={600}>
       {bundles.length === 0 ? (
         <Text type="secondary">Qoldiq yog'och yo'q</Text>
@@ -726,7 +742,7 @@ function BundleSellModal({ wagon, open, onClose }) {
               if ((b.remainingCount || 0) <= 0) return null;
               return (
                 <tr key={idx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={cellS}>{b.thickness}×{b.width}×{b.length}</td>
+                  <td style={cellS}>{b.thickness}mm × {b.width}mm × {b.length}m</td>
                   <td style={cellS}>{b.remainingCount} dona</td>
                   <td style={cellS}>
                     <InputNumber size="small" min={1} max={b.remainingCount}
@@ -755,6 +771,7 @@ export default function Wagons() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ status: undefined, startDate: undefined, endDate: undefined });
   const [createOpen, setCreateOpen] = useState(false);
+  const [createType, setCreateType] = useState('vagon');
   const [selectedWagon, setSelectedWagon] = useState(null);
   const [viewMode, setViewMode] = useState('card');
   const [sellWagon, setSellWagon] = useState(null);
@@ -764,7 +781,7 @@ export default function Wagons() {
 
   const createMutation = useMutation({
     mutationFn: createWagon,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setCreateOpen(false); message.success('Vagon yaratildi'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setCreateOpen(false); message.success(createType === 'mashina' ? 'Mashina yaratildi' : 'Vagon yaratildi'); },
     onError: () => message.error('Yaratishda xatolik'),
   });
 
@@ -790,7 +807,8 @@ export default function Wagons() {
   const archivedWagons = wagons.filter((w) => w.status === 'omborda');
 
   const columns = [
-    { title: 'Vagon kodi', dataIndex: 'wagonCode', key: 'wagonCode', width: 120 },
+    { title: 'Turi', dataIndex: 'type', key: 'type', width: 80, render: (t) => t === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag> },
+    { title: 'Kod/Raqam', dataIndex: 'wagonCode', key: 'wagonCode', width: 120 },
     { title: 'Status', dataIndex: 'status', key: 'status', width: 100, render: (s) => <Tag color={statusColors[s]}>{statusLabels[s] || s}</Tag> },
     { title: "Jo'natilgan", dataIndex: 'sentDate', key: 'sentDate', width: 110, render: formatDate },
     { title: 'Kelgan', dataIndex: 'arrivedDate', key: 'arrivedDate', width: 110, render: formatDate },
@@ -844,7 +862,10 @@ export default function Wagons() {
               { value: 'card', icon: <AppstoreOutlined /> },
             ]} />
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}>Yangi vagon</Button>
+        <Space>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCreateType('vagon'); setCreateOpen(true); }}>Yangi vagon</Button>
+          <Button icon={<CarOutlined />} onClick={() => { setCreateType('mashina'); setCreateOpen(true); }}>Yangi mashina</Button>
+        </Space>
       </div>
 
       <Tabs defaultActiveKey="active" items={[
@@ -862,7 +883,7 @@ export default function Wagons() {
 
       <CreateWagonModal open={createOpen} onCancel={() => setCreateOpen(false)}
         onSave={(data) => createMutation.mutate(data)} loading={createMutation.isPending}
-        globalRate={rateData?.rate || 0} />
+        globalRate={rateData?.rate || 0} transportType={createType} />
 
       <WagonDetailModal wagon={selectedWagon} open={!!selectedWagon} onClose={() => setSelectedWagon(null)}
         onUpdate={(data) => updateMutation.mutate({ id: selectedWagon._id, data })}

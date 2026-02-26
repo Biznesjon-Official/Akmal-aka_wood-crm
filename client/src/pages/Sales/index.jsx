@@ -28,7 +28,7 @@ export default function Sales() {
   const [currency, setCurrency] = useState('USD');
   const [paidAmount, setPaidAmount] = useState(0);
   const [note, setNote] = useState('');
-  const [prices, setPrices] = useState({}); // { "wagonId-bundleIndex": pricePerPiece }
+  const [prices, setPrices] = useState({}); // { "wagonId-bundleIndex": pricePerM3 }
   const [totalOverride, setTotalOverride] = useState(null); // null = auto, number = manual
   const [totalInputValue, setTotalInputValue] = useState(null); // local input state
   const [totalFocused, setTotalFocused] = useState(false);
@@ -56,9 +56,10 @@ export default function Sales() {
 
   const getKey = (item) => `${item.wagonId}-${item.bundleIndex}`;
 
-  // Auto-calculated total from individual sale prices (per row total)
+  // Auto-calculated total from pricePerM3 * totalM3
   const autoTotal = cartItems.reduce((sum, item) => {
-    return sum + (prices[getKey(item)] || 0);
+    const pricePerM3 = prices[getKey(item)] || 0;
+    return sum + Math.round(pricePerM3 * item.m3PerPiece * item.quantity);
   }, 0);
 
   // Total cost price (tannarx)
@@ -119,14 +120,16 @@ export default function Sales() {
       return;
     }
 
-    // Check if individual prices are filled
+    // Check if individual m3 prices are filled
     const hasIndividualPrices = cartItems.every((item) => prices[getKey(item)] > 0);
 
     let saleItems;
     if (hasIndividualPrices) {
-      // Use individual prices
+      // Calculate from pricePerM3
       saleItems = cartItems.map((item) => {
-        const rowTotal = prices[getKey(item)] || 0;
+        const pricePerM3 = prices[getKey(item)] || 0;
+        const totalM3 = item.m3PerPiece * item.quantity;
+        const rowTotal = Math.round(pricePerM3 * totalM3);
         return {
           wagon: item.wagonId,
           bundleIndex: item.bundleIndex,
@@ -135,6 +138,22 @@ export default function Sales() {
           totalAmount: rowTotal,
         };
       });
+
+      // If totalOverride is set, adjust proportionally
+      if (totalOverride !== null && totalOverride !== autoTotal) {
+        const currentSum = saleItems.reduce((s, it) => s + it.totalAmount, 0);
+        if (currentSum > 0) {
+          let distributed = 0;
+          saleItems.forEach((it, i) => {
+            const isLast = i === saleItems.length - 1;
+            it.totalAmount = isLast
+              ? finalTotal - distributed
+              : Math.round(finalTotal * (it.totalAmount / currentSum));
+            distributed += it.totalAmount;
+            it.pricePerPiece = it.quantity > 0 ? it.totalAmount / it.quantity : 0;
+          });
+        }
+      }
     } else {
       // Distribute total by tannarx ratio
       const costPerItem = cartItems.map((item) =>
@@ -190,7 +209,7 @@ export default function Sales() {
       title: "O'lcham",
       key: 'dimension',
       width: 120,
-      render: (_, r) => `${r.thickness}×${r.width}×${r.length}`,
+      render: (_, r) => `${r.thickness}mm × ${r.width}mm × ${r.length}m`,
     },
     {
       title: 'Soni',
@@ -208,24 +227,45 @@ export default function Sales() {
       render: (_, r) => formatM3(r.m3PerPiece * r.quantity),
     },
     {
-      title: 'Tannarx',
+      title: 'Tannarx/m³',
       key: 'costPrice',
-      width: 110,
+      width: 120,
       render: (_, r) => {
-        const cost = Math.round((r.costPricePerM3 || 0) * r.m3PerPiece * r.quantity);
-        return <Text type="secondary">{formatMoney(cost, currency)}</Text>;
+        const costPerM3 = r.costPricePerM3 || 0;
+        const totalCost = Math.round(costPerM3 * r.m3PerPiece * r.quantity);
+        return (
+          <div>
+            <Text strong>{formatMoney(Math.round(costPerM3), currency)}</Text>
+            <br />
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Jami: {formatMoney(totalCost, currency)}
+            </Text>
+          </div>
+        );
       },
     },
     {
-      title: `Sotuv narxi`,
+      title: 'Sotuv/m³',
       key: 'salePrice',
-      width: 130,
-      render: (_, r) => (
-        <InputNumber size="small" min={0} style={{ width: 110 }}
-          value={prices[getKey(r)] || null}
-          onChange={(v) => handlePriceChange(getKey(r), v)}
-          placeholder="0" addonAfter={currency} />
-      ),
+      width: 150,
+      render: (_, r) => {
+        const pricePerM3 = prices[getKey(r)] || 0;
+        const rowTotal = Math.round(pricePerM3 * r.m3PerPiece * r.quantity);
+        return (
+          <div>
+            <InputNumber size="small" min={0} style={{ width: 120 }}
+              value={pricePerM3 || null}
+              onChange={(v) => handlePriceChange(getKey(r), v)}
+              placeholder={String(Math.round(r.costPricePerM3 || 0))}
+              addonAfter={currency} />
+            {pricePerM3 > 0 && (
+              <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
+                Jami: {formatMoney(rowTotal, currency)}
+              </Text>
+            )}
+          </div>
+        );
+      },
     },
     {
       title: '',
@@ -413,6 +453,18 @@ export default function Sales() {
                 <Text type="secondary" style={{ fontSize: 14 }}>Jami tannarx:</Text>
                 <Text strong style={{ fontSize: 16 }}>{formatMoney(totalCostPrice, currency)}</Text>
               </div>
+
+              {autoTotal > 0 && totalCostPrice > 0 && (
+                <div style={{
+                  padding: 8, background: '#fffbe6', borderRadius: 8,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <Text type="secondary" style={{ fontSize: 13 }}>Foyda:</Text>
+                  <Text strong style={{ fontSize: 14, color: autoTotal > totalCostPrice ? '#52c41a' : '#cf1322' }}>
+                    {formatMoney(autoTotal - totalCostPrice, currency)} ({totalCostPrice > 0 ? Math.round((autoTotal - totalCostPrice) / totalCostPrice * 100) : 0}%)
+                  </Text>
+                </div>
+              )}
 
               <div style={{
                 padding: 12, background: '#f6ffed', borderRadius: 8,

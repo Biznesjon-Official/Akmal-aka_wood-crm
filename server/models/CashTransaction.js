@@ -4,7 +4,7 @@ const cashTransactionSchema = new mongoose.Schema({
   type: { type: String, enum: ['kirim', 'chiqim'], required: true },
   category: {
     type: String,
-    enum: ['sotuv', 'qarz_tolovi', 'yetkazma', 'boshqa'],
+    enum: ['sotuv', 'qarz_tolovi', 'yetkazma', 'xarid', 'transport', 'soliq', 'boshqa'],
     default: 'boshqa'
   },
   amount: { type: Number, required: true },

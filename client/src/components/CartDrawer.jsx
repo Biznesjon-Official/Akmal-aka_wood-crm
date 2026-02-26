@@ -33,7 +33,7 @@ export default function CartDrawer() {
       title: "O'lcham",
       key: 'dimension',
       width: 140,
-      render: (_, r) => `${r.thickness}×${r.width}×${r.length}`,
+      render: (_, r) => `${r.thickness}mm × ${r.width}mm × ${r.length}m`,
     },
     {
       title: 'Soni',

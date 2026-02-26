@@ -201,7 +201,7 @@ export default function Warehouse() {
                     )}
                   </div>
                   <div className="warehouse-card-dimension">
-                    {b.thickness}<span>×</span>{b.width}<span>×</span>{b.length}
+                    {b.thickness}mm<span> × </span>{b.width}mm<span> × </span>{b.length}m
                   </div>
                   <div className="warehouse-card-info">
                     <div className="warehouse-card-row">

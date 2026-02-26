@@ -11,16 +11,17 @@ function mapCategory(description) {
 }
 
 // Sync wagon expenses → CashTransaction records
-async function syncWagonCashTransactions(wagonId, expenses) {
+async function syncWagonCashTransactions(wagonId, expenses, transportType) {
   await CashTransaction.deleteMany({ relatedWagon: wagonId });
   if (!expenses || expenses.length === 0) return;
+  const prefix = transportType === 'mashina' ? 'Mashina' : 'Vagon';
   const docs = expenses.map((e) => ({
     type: 'chiqim',
     category: mapCategory(e.description),
     amount: e.amount,
     currency: e.currency || 'USD',
     account: (e.currency || 'USD') === 'RUB' ? 'RUB_account' : 'USD_account',
-    description: `Vagon: ${e.description}`,
+    description: `${prefix}: ${e.description}`,
     relatedWagon: wagonId,
   }));
   await CashTransaction.insertMany(docs);
@@ -52,7 +53,7 @@ exports.getOne = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const wagon = await Wagon.create(req.body);
-    await syncWagonCashTransactions(wagon._id, wagon.expenses);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
     res.status(201).json(wagon);
   } catch (err) { next(err); }
 };
@@ -63,7 +64,7 @@ exports.update = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     Object.assign(wagon, req.body);
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
     res.json(wagon);
   } catch (err) { next(err); }
 };
@@ -107,7 +108,7 @@ exports.updateExpenses = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     wagon.expenses = req.body.expenses;
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
     res.json(wagon);
   } catch (err) { next(err); }
 };

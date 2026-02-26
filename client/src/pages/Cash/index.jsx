@@ -24,7 +24,8 @@ const typeOptions = [
 const kirimSourceOptions = [
   { value: 'sotuv', label: 'Yog\'och sotuvi' },
   { value: 'qarz_tolovi', label: 'Qarz to\'lovi' },
-  { value: 'yetkazma', label: 'Yog\'och yetkazib berish' },
+  { value: 'yetkazma', label: 'Yetkazma daromadi' },
+  { value: 'boshqa', label: 'Boshqa' },
 ];
 
 const kirimSourceMap = Object.fromEntries(kirimSourceOptions.map((o) => [o.value, o.label]));
@@ -188,11 +189,17 @@ export default function Cash() {
 
   const chiqimSourceOptions = sources.map((s) => ({ value: s._id, label: s.name }));
 
+  const categoryLabels = {
+    sotuv: 'Yog\'och sotuvi', qarz_tolovi: 'Qarz to\'lovi', yetkazma: 'Yetkazma',
+    xarid: 'Yog\'och xaridi', transport: 'Transport', soliq: 'Soliq', boshqa: 'Boshqa',
+  };
+
   const getSourceName = (record) => {
     if (record.type === 'kirim') {
-      return kirimSourceMap[record.category] || record.category || '—';
+      return kirimSourceMap[record.category] || categoryLabels[record.category] || record.category || '—';
     }
-    return record.source?.name || '—';
+    if (record.source?.name) return record.source.name;
+    return categoryLabels[record.category] || record.description || '—';
   };
 
   const columns = [
