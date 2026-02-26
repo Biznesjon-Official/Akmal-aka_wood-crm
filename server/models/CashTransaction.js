@@ -17,6 +17,7 @@ const cashTransactionSchema = new mongoose.Schema({
   relatedConversion: { type: mongoose.Schema.Types.ObjectId, ref: 'CurrencyConversion' },
   relatedMyDebt: { type: mongoose.Schema.Types.ObjectId, ref: 'MyDebt' },
   relatedTopUp: { type: mongoose.Schema.Types.ObjectId, ref: 'TopUp' },
+  relatedDelivery: { type: mongoose.Schema.Types.ObjectId, ref: 'Delivery' },
   date: { type: Date, default: Date.now }
 }, { timestamps: true });
 
@@ -25,6 +26,7 @@ cashTransactionSchema.index({ relatedSale: 1 });
 cashTransactionSchema.index({ relatedConversion: 1 });
 cashTransactionSchema.index({ relatedMyDebt: 1 });
 cashTransactionSchema.index({ relatedTopUp: 1 });
+cashTransactionSchema.index({ relatedDelivery: 1 });
 cashTransactionSchema.index({ currency: 1, type: 1 });
 
 module.exports = mongoose.model('CashTransaction', cashTransactionSchema);

@@ -66,6 +66,13 @@ export const createMyDebt = (data) => api.post('/my-debts', data).then(r => r.da
 export const addMyDebtPayment = (id, data) => api.post(`/my-debts/${id}/payments`, data).then(r => r.data);
 export const deleteMyDebt = (id) => api.delete(`/my-debts/${id}`).then(r => r.data);
 
+// Deliveries
+export const getDeliveries = (params) => api.get('/deliveries', { params }).then(r => r.data);
+export const createDelivery = (data) => api.post('/deliveries', data).then(r => r.data);
+export const updateDelivery = (id, data) => api.put(`/deliveries/${id}`, data).then(r => r.data);
+export const deleteDelivery = (id) => api.delete(`/deliveries/${id}`).then(r => r.data);
+export const markDelivered = (id) => api.put(`/deliveries/${id}/deliver`).then(r => r.data);
+
 // Settings
 export const getExchangeRate = () => api.get('/settings/exchange-rate').then(r => r.data);
 export const setExchangeRate = (rate) => api.put('/settings/exchange-rate', { rate }).then(r => r.data);

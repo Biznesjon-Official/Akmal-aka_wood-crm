@@ -356,3 +356,30 @@
   color: #1677ff;
   font-size: 24px;
 }
+
+/* ===================== DELIVERY CARD ===================== */
+.delivery-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f0f0f0;
+  height: 100%;
+}
+
+.delivery-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-color: #d9d9d9;
+}
+
+.delivery-card .ant-card-body {
+  padding: 0 !important;
+}
+
+.delivery-card.yolda {
+  border-left: 4px solid #faad14;
+}
+
+.delivery-card.yetkazildi {
+  border-left: 4px solid #52c41a;
+}

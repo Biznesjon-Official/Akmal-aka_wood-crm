@@ -15,6 +15,7 @@ const Customers = lazy(() => import('./pages/Customers'));
 const Debts = lazy(() => import('./pages/Debts'));
 const Cash = lazy(() => import('./pages/Cash'));
 const Transfers = lazy(() => import('./pages/Transfers'));
+const Deliveries = lazy(() => import('./pages/Deliveries'));
 
 const PageLoader = <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
 
@@ -48,6 +49,7 @@ export default function App() {
               <Route path="/debts" element={<Debts />} />
               <Route path="/cash" element={<Cash />} />
               <Route path="/transfers" element={<Transfers />} />
+              <Route path="/deliveries" element={<Deliveries />} />
               <Route path="*" element={<Navigate to="/" />} />
             </Route>
           </Routes>

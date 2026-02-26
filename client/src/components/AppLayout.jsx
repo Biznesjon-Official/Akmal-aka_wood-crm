@@ -11,6 +11,7 @@ import {
   FileTextOutlined,
   WalletOutlined,
   SwapOutlined,
+  TruckOutlined,
 } from '@ant-design/icons';
 
 const { Sider, Content } = Layout;
@@ -23,6 +24,7 @@ const menuItems = [
   { key: '/customers', icon: <UserOutlined />, label: 'Mijozlar' },
   { key: '/debts', icon: <FileTextOutlined />, label: 'Qarzdaftarcha' },
   { key: '/cash', icon: <WalletOutlined />, label: 'Kassa' },
+  { key: '/deliveries', icon: <TruckOutlined />, label: 'Yetkazmalar' },
   { key: '/transfers', icon: <SwapOutlined />, label: "O'tkazish" }
 ];
 
