@@ -2,19 +2,22 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   Table, Button, Modal, Select, InputNumber,
   DatePicker, Tag, message, Space, Input, Typography, Divider, Popconfirm,
+  Row, Col, Card, Segmented,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { getSales, createSale, getCustomers } from '../../api';
 import { formatDate, formatMoney, formatM3 } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
+import '../styles/cards.css';
 
 const { Text } = Typography;
 
 export default function Sales() {
   const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('card');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { items: cartItems, removeItem, updateQuantity, clearCart, cartCount } = useCart();
@@ -285,22 +288,69 @@ export default function Sales() {
     },
   ];
 
+  const renderSaleCards = () => (
+    <Row gutter={[16, 16]}>
+      {sales.map((sale) => {
+        const debt = (sale.totalAmount || 0) - (sale.paidAmount || 0);
+        const isPaid = debt <= 0;
+        return (
+          <Col xs={24} sm={12} lg={8} xl={6} key={sale._id}>
+            <Card className={`grid-card sale-card ${isPaid ? 'paid' : debt > 0 ? 'has-debt' : ''}`}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <Text strong style={{ fontSize: 15 }}>{sale.customer?.name || '—'}</Text>
+                <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(sale.date)}</Text>
+              </div>
+              <div className="grid-card-row">
+                <Text type="secondary">Jami:</Text>
+                <Text strong>{formatMoney(sale.totalAmount, sale.currency)}</Text>
+              </div>
+              <div className="grid-card-row">
+                <Text type="secondary">To'langan:</Text>
+                <Text style={{ color: '#52c41a' }}>{formatMoney(sale.paidAmount, sale.currency)}</Text>
+              </div>
+              {debt > 0 && (
+                <div className="grid-card-row">
+                  <Text type="secondary">Qarz:</Text>
+                  <Text type="danger" strong>{formatMoney(debt, sale.currency)}</Text>
+                </div>
+              )}
+              <div className="grid-card-footer">
+                <Tag>{sale.items?.length || 0} mahsulot</Tag>
+                {isPaid ? <Tag color="success">To'langan</Tag> : <Tag color="error">Qarzda</Tag>}
+              </div>
+              {sale.note && <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }} ellipsis>{sale.note}</Text>}
+            </Card>
+          </Col>
+        );
+      })}
+    </Row>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2 style={{ margin: 0 }}>Sotuvlar</h2>
+        <Space>
+          <h2 style={{ margin: 0 }}>Sotuvlar</h2>
+          <Segmented value={viewMode} onChange={setViewMode}
+            options={[
+              { value: 'card', icon: <AppstoreOutlined /> },
+              { value: 'table', icon: <BarsOutlined /> },
+            ]} />
+        </Space>
         <Button type="primary" icon={<ShoppingCartOutlined />} onClick={handleOpenNew}>
           Yangi sotuv {cartCount > 0 && `(${cartCount})`}
         </Button>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={sales}
-        rowKey="_id"
-        loading={isLoading}
-        pagination={{ pageSize: 20 }}
-      />
+      {viewMode === 'card' ? renderSaleCards() : (
+        <Table
+          columns={columns}
+          dataSource={sales}
+          rowKey="_id"
+          loading={isLoading}
+          pagination={{ pageSize: 20 }}
+        />
+      )}
 
       <Modal
         title={`Yangi sotuv (${cartItems.length} mahsulot)`}

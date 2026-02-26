@@ -756,7 +756,7 @@ export default function Wagons() {
   const [filters, setFilters] = useState({ status: undefined, startDate: undefined, endDate: undefined });
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedWagon, setSelectedWagon] = useState(null);
-  const [viewMode, setViewMode] = useState('table');
+  const [viewMode, setViewMode] = useState('card');
   const [sellWagon, setSellWagon] = useState(null);
 
   const { data: wagons = [], isLoading } = useQuery({ queryKey: ['wagons', filters], queryFn: () => getWagons(filters) });

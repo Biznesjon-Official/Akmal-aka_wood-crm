@@ -246,6 +246,76 @@
   height: 36px;
 }
 
+/* ===================== GENERIC GRID CARD ===================== */
+.grid-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #f0f0f0;
+  height: 100%;
+}
+
+.grid-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  border-color: #d9d9d9;
+}
+
+.grid-card .ant-card-body {
+  padding: 16px !important;
+}
+
+.grid-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 8px;
+}
+
+.grid-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.grid-card-footer {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ===================== SALE CARD ===================== */
+.sale-card {
+  border-left: 4px solid #1677ff;
+}
+
+.sale-card.has-debt {
+  border-left-color: #ff4d4f;
+}
+
+.sale-card.paid {
+  border-left-color: #52c41a;
+}
+
+/* ===================== CUSTOMER CARD ===================== */
+.customer-card {
+  border-left: 4px solid #1677ff;
+}
+
+/* ===================== CASH CARD ===================== */
+.cash-card.kirim {
+  border-left: 4px solid #52c41a;
+}
+
+.cash-card.chiqim {
+  border-left: 4px solid #ff4d4f;
+}
+
 /* ===================== SUMMARY FOOTER ===================== */
 .summary-card {
   border-radius: 12px;

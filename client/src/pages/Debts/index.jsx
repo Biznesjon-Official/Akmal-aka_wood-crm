@@ -2,9 +2,9 @@ import React, { useMemo, useState } from 'react';
 import {
   Table, Button, Modal, Form, InputNumber, Select, DatePicker,
   Input, message, Tag, Typography, Space, Spin, Card, Tabs, Popconfirm,
-  Row, Col, Progress, Timeline, Empty,
+  Row, Col, Progress, Timeline, Empty, Segmented,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
@@ -21,6 +21,7 @@ function CustomerDebts() {
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [viewMode, setViewMode] = useState('card');
 
   const { data: salesRaw, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
@@ -154,6 +155,15 @@ function CustomerDebts() {
       sorter: (a, b) => a.totalDebt - b.totalDebt,
       defaultSortOrder: 'descend',
     },
+    {
+      title: '', key: 'actions', width: 100,
+      render: (_, rec) => (
+        <Button type="primary" size="small" icon={<DollarOutlined />}
+          onClick={(e) => { e.stopPropagation(); handlePayment(rec.sales[0]); }}>
+          To'lash
+        </Button>
+      ),
+    },
   ];
 
   if (salesLoading || paymentsLoading) {
@@ -165,6 +175,11 @@ function CustomerDebts() {
       <Card style={{ marginBottom: 16 }}>
         <Space size="large" align="center">
           <Title level={4} style={{ margin: 0 }}>Mijozlar qarzlari</Title>
+          <Segmented value={viewMode} onChange={setViewMode}
+            options={[
+              { value: 'card', icon: <AppstoreOutlined /> },
+              { value: 'table', icon: <BarsOutlined /> },
+            ]} />
           {totalDebtUSD > 0 && (
             <Tag color="red" style={{ fontSize: 16, padding: '4px 12px' }}>
               Jami: {formatMoney(totalDebtUSD, 'USD')}
@@ -178,23 +193,48 @@ function CustomerDebts() {
         </Space>
       </Card>
 
-      <Table
-        columns={columns}
-        dataSource={customerDebts}
-        rowKey="customerId"
-        pagination={{ pageSize: 20 }}
-        expandable={{
-          expandedRowRender: (record) => (
-            <Table
-              columns={saleColumns}
-              dataSource={record.sales}
-              rowKey="_id"
-              pagination={false}
-              size="small"
-            />
-          ),
-        }}
-      />
+      {viewMode === 'card' ? (
+        <Row gutter={[16, 16]}>
+          {customerDebts.map((cd) => (
+            <Col xs={24} sm={12} lg={8} key={cd.customerId}>
+              <Card size="small" style={{ borderLeft: '4px solid #ff4d4f', borderRadius: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: 16 }}>{cd.customerName}</Text>
+                  <Text type="danger" strong style={{ fontSize: 16 }}>{formatMoney(cd.totalDebt, cd.currency)}</Text>
+                </div>
+                <Text type="secondary">{cd.sales.length} ta sotuv</Text>
+                <div style={{ marginTop: 8 }}>
+                  {cd.sales.slice(0, 3).map((s) => (
+                    <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(s.date)} — {formatMoney(s.debt, s.currency)}</Text>
+                      <Button type="primary" size="small" onClick={() => handlePayment(s)}>To'lash</Button>
+                    </div>
+                  ))}
+                  {cd.sales.length > 3 && <Text type="secondary" style={{ fontSize: 11 }}>+{cd.sales.length - 3} ta yana...</Text>}
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={customerDebts}
+          rowKey="customerId"
+          pagination={{ pageSize: 20 }}
+          expandable={{
+            expandedRowRender: (record) => (
+              <Table
+                columns={saleColumns}
+                dataSource={record.sales}
+                rowKey="_id"
+                pagination={false}
+                size="small"
+              />
+            ),
+          }}
+        />
+      )}
 
       <Modal
         title="To'lov qilish"

@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Drawer, List, Tag } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Drawer, List, Tag, Row, Col, Card, Segmented, Typography } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getCustomerDebts } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
+import '../styles/cards.css';
+
+const { Text } = Typography;
 
 const Customers = () => {
+  const [viewMode, setViewMode] = useState('card');
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
@@ -165,21 +169,60 @@ const Customers = () => {
     },
   ];
 
+  const renderCustomerCards = () => (
+    <Row gutter={[16, 16]}>
+      {(customers || []).map((c) => (
+        <Col xs={24} sm={12} lg={8} xl={6} key={c._id}>
+          <Card className="grid-card customer-card">
+            <div className="grid-card-title">{c.name}</div>
+            {c.phone && (
+              <div style={{ marginBottom: 4 }}>
+                <PhoneOutlined style={{ color: '#999', marginRight: 6 }} />
+                <Text type="secondary">{c.phone}</Text>
+              </div>
+            )}
+            {c.note && <Text type="secondary" style={{ fontSize: 12 }} ellipsis>{c.note}</Text>}
+            <div className="grid-card-footer">
+              <Text type="secondary" style={{ fontSize: 11 }}>{formatDate(c.createdAt)}</Text>
+              <Space size="small">
+                <Button size="small" icon={<EyeOutlined />} onClick={() => openDrawer(c)} />
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(c)} />
+                <Popconfirm title="O'chirishni tasdiqlaysizmi?"
+                  onConfirm={() => deleteMutation.mutate(c._id)}>
+                  <Button size="small" danger icon={<DeleteOutlined />} />
+                </Popconfirm>
+              </Space>
+            </div>
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h2>Mijozlar</h2>
+        <Space>
+          <h2 style={{ margin: 0 }}>Mijozlar</h2>
+          <Segmented value={viewMode} onChange={setViewMode}
+            options={[
+              { value: 'card', icon: <AppstoreOutlined /> },
+              { value: 'table', icon: <BarsOutlined /> },
+            ]} />
+        </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Mijoz qo'shish
         </Button>
       </div>
 
-      <Table
-        rowKey="_id"
-        columns={columns}
-        dataSource={customers}
-        loading={isLoading}
-      />
+      {viewMode === 'card' ? renderCustomerCards() : (
+        <Table
+          rowKey="_id"
+          columns={columns}
+          dataSource={customers}
+          loading={isLoading}
+        />
+      )}
 
       {/* Create / Edit Modal */}
       <Modal

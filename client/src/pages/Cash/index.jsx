@@ -2,17 +2,19 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, InputNumber, Select, DatePicker,
-  Input, message, Tag, Card, Row, Col, Statistic, Space, Popconfirm, List, Switch,
+  Input, message, Tag, Card, Row, Col, Statistic, Space, Popconfirm, List, Switch, Segmented, Typography,
 } from 'antd';
-import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getCashTransactions, createCashTransaction, getCashBalance,
   getExpenseSources, createExpenseSource, updateExpenseSource, deleteExpenseSource,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
+import '../styles/cards.css';
 
 const { RangePicker } = DatePicker;
+const { Text } = Typography;
 
 const typeOptions = [
   { value: 'kirim', label: 'Kirim' },
@@ -39,6 +41,7 @@ const accountOptions = [
 
 export default function Cash() {
   const queryClient = useQueryClient();
+  const [viewMode, setViewMode] = useState('card');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [sourcesModalOpen, setSourcesModalOpen] = useState(false);
@@ -233,6 +236,11 @@ export default function Cash() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space wrap>
+          <Segmented value={viewMode} onChange={setViewMode}
+            options={[
+              { value: 'card', icon: <AppstoreOutlined /> },
+              { value: 'table', icon: <BarsOutlined /> },
+            ]} />
           <Select placeholder="Turi" allowClear style={{ width: 150 }} options={typeOptions}
             onChange={(val) => setFilters((prev) => ({ ...prev, type: val }))} />
           <Select placeholder="Chiqim manbasi" allowClear style={{ width: 170 }} options={chiqimSourceOptions}
@@ -252,7 +260,34 @@ export default function Cash() {
         </Space>
       </div>
 
-      <Table columns={columns} dataSource={transactions} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }} />
+      {viewMode === 'card' ? (
+        <Row gutter={[12, 12]}>
+          {transactions.map((tx) => (
+            <Col xs={24} sm={12} lg={8} xl={6} key={tx._id}>
+              <Card className={`grid-card cash-card ${tx.type}`} size="small">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Tag color={tx.type === 'kirim' ? 'green' : 'red'}>{tx.type === 'kirim' ? 'Kirim' : 'Chiqim'}</Tag>
+                  <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(tx.date)}</Text>
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: tx.type === 'chiqim' ? '#cf1322' : '#389e0d', marginBottom: 4 }}>
+                  {tx.type === 'chiqim' ? '−' : '+'}{formatMoney(tx.amount, tx.currency)}
+                </div>
+                <div className="grid-card-row">
+                  <Text type="secondary" style={{ fontSize: 12 }}>Manba:</Text>
+                  <Text style={{ fontSize: 12 }}>{getSourceName(tx)}</Text>
+                </div>
+                <div className="grid-card-row">
+                  <Text type="secondary" style={{ fontSize: 12 }}>Hisob:</Text>
+                  <Text style={{ fontSize: 12 }}>{accountOptions.find((a) => a.value === tx.account)?.label || tx.account}</Text>
+                </div>
+                {tx.description && <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }} ellipsis>{tx.description}</Text>}
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Table columns={columns} dataSource={transactions} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }} />
+      )}
 
       {/* Create transaction modal */}
       <Modal
