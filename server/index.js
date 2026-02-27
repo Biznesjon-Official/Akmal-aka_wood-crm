@@ -30,6 +30,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/expense-sources', require('./routes/expenseSources'));
 app.use('/api/my-debts', require('./routes/myDebts'));
+app.use('/api/lent-debts', require('./routes/lentDebts'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 
 // Production: serve client build

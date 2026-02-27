@@ -637,7 +637,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
 function WagonCard({ wagon, onClick, isArchive, onSell }) {
   const totalM3 = (wagon.woodBundles || []).reduce((s, b) => s + (b.totalM3 || 0), 0);
   const bundleCount = (wagon.woodBundles || []).length;
-  const status = isArchive ? 'omborda' : wagon.status;
+  const status = isArchive ? 'sotildi' : wagon.status;
   const hasStock = (wagon.woodBundles || []).some(b => (b.remainingCount || 0) > 0);
 
   return (
@@ -651,7 +651,7 @@ function WagonCard({ wagon, onClick, isArchive, onSell }) {
           </div>
         </div>
         {isArchive
-          ? <Tag>Bo'sh</Tag>
+          ? <Tag color="default">Sotildi</Tag>
           : <Tag color={statusColors[wagon.status]}>{statusLabels[wagon.status]}</Tag>}
       </div>
       <div className="wagon-card-route">
@@ -802,9 +802,12 @@ export default function Wagons() {
     onError: () => message.error('Xatolik yuz berdi'),
   });
 
-  // Separate active wagons and archived (omborda) wagons
-  const activeWagons = wagons.filter((w) => w.status !== 'omborda');
-  const archivedWagons = wagons.filter((w) => w.status === 'omborda');
+  // Separate active wagons and archived (all bundles sold) wagons
+  const archivedWagons = wagons.filter((w) => {
+    const bundles = w.woodBundles || [];
+    return bundles.length > 0 && bundles.every(b => (b.remainingCount || 0) === 0);
+  });
+  const activeWagons = wagons.filter((w) => !archivedWagons.includes(w));
 
   const columns = [
     { title: 'Turi', dataIndex: 'type', key: 'type', width: 80, render: (t) => t === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag> },
@@ -818,10 +821,10 @@ export default function Wagons() {
     { title: 'Tannarx/m³', dataIndex: 'costPricePerM3', key: 'costPricePerM3', width: 120, render: (v) => formatMoney(v) },
   ];
 
-  // Archive columns — show "Bo'sh" instead of actual status
+  // Archive columns — show "Sotildi" instead of actual status
   const archiveColumns = columns.map((c) =>
     c.key === 'status'
-      ? { ...c, render: () => <Tag>Bo'sh</Tag> }
+      ? { ...c, render: () => <Tag color="default">Sotildi</Tag> }
       : c
   );
 

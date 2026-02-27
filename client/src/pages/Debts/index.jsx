@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import {
   getSales, getPayments, createPayment,
   getMyDebts, createMyDebt, addMyDebtPayment, deleteMyDebt,
+  getLentDebts, createLentDebt, addLentDebtPayment, deleteLentDebt,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 
@@ -585,6 +586,317 @@ function MyDebtsSection() {
   );
 }
 
+// ─── Mendan qarzdarlar (I lent money to someone) ───
+function LentDebtsSection() {
+  const queryClient = useQueryClient();
+  const [debtForm] = Form.useForm();
+  const [payForm] = Form.useForm();
+  const [debtModalOpen, setDebtModalOpen] = useState(false);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedDebt, setSelectedDebt] = useState(null);
+
+  const { data: debts = [], isLoading } = useQuery({
+    queryKey: ['lent-debts'],
+    queryFn: getLentDebts,
+  });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['lent-debts'] });
+    queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  const createMutation = useMutation({
+    mutationFn: createLentDebt,
+    onSuccess: () => {
+      invalidateAll();
+      message.success("Qarz qo'shildi");
+      setDebtModalOpen(false);
+      debtForm.resetFields();
+    },
+    onError: () => message.error('Xatolik'),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: ({ id, data }) => addLentDebtPayment(id, data),
+    onSuccess: () => {
+      invalidateAll();
+      message.success("To'lov qo'shildi");
+      setPayModalOpen(false);
+      setSelectedDebt(null);
+      payForm.resetFields();
+    },
+    onError: () => message.error('Xatolik'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteLentDebt,
+    onSuccess: () => {
+      invalidateAll();
+      message.success("Qarz o'chirildi");
+    },
+  });
+
+  const { totalUSD, totalRUB } = useMemo(() => {
+    let usd = 0, rub = 0;
+    debts.forEach((d) => {
+      if (d.currency === 'RUB') rub += d.remainingDebt;
+      else usd += d.remainingDebt;
+    });
+    return { totalUSD: usd, totalRUB: rub };
+  }, [debts]);
+
+  const handleCreateDebt = async () => {
+    try {
+      const values = await debtForm.validateFields();
+      createMutation.mutate({
+        ...values,
+        date: values.date?.toISOString(),
+      });
+    } catch { /* validation */ }
+  };
+
+  const handlePay = (debt) => {
+    setSelectedDebt(debt);
+    payForm.setFieldsValue({ amount: null, date: dayjs(), note: '' });
+    setPayModalOpen(true);
+  };
+
+  const handlePaySubmit = async () => {
+    try {
+      const values = await payForm.validateFields();
+      payMutation.mutate({
+        id: selectedDebt._id,
+        data: { amount: values.amount, date: values.date?.toISOString(), note: values.note },
+      });
+    } catch { /* validation */ }
+  };
+
+  const handleViewHistory = (debt) => {
+    setSelectedDebt(debt);
+    setHistoryModalOpen(true);
+  };
+
+  if (isLoading) {
+    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
+  }
+
+  return (
+    <>
+      <Card style={{ marginBottom: 16 }}>
+        <Space size="large" align="center">
+          <Title level={4} style={{ margin: 0 }}>Mendan qarzdarlar</Title>
+          {totalUSD > 0 && (
+            <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
+              Jami: {formatMoney(totalUSD, 'USD')}
+            </Tag>
+          )}
+          {totalRUB > 0 && (
+            <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
+              Jami: {formatMoney(totalRUB, 'RUB')}
+            </Tag>
+          )}
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>
+            Qarz berish
+          </Button>
+        </Space>
+      </Card>
+
+      {debts.length === 0 ? (
+        <Empty description="Qarzdarlar yo'q" />
+      ) : (
+        <Row gutter={[16, 16]}>
+          {debts.map((debt) => {
+            const percent = debt.amount > 0 ? Math.round((debt.paidAmount / debt.amount) * 100) : 0;
+            const isDone = debt.remainingDebt <= 0;
+            return (
+              <Col xs={24} sm={12} lg={8} key={debt._id}>
+                <Card
+                  size="small"
+                  style={{
+                    borderLeft: `4px solid ${isDone ? '#52c41a' : '#1677ff'}`,
+                    opacity: isDone ? 0.7 : 1,
+                  }}
+                  actions={[
+                    <Button
+                      type="link"
+                      icon={<DollarOutlined />}
+                      disabled={isDone}
+                      onClick={() => handlePay(debt)}
+                      key="pay"
+                    >
+                      Olish
+                    </Button>,
+                    <Button
+                      type="link"
+                      icon={<EyeOutlined />}
+                      onClick={() => handleViewHistory(debt)}
+                      key="view"
+                    >
+                      Tarix ({debt.payments?.length || 0})
+                    </Button>,
+                    <Popconfirm
+                      title="O'chirishni tasdiqlaysizmi?"
+                      onConfirm={() => deleteMutation.mutate(debt._id)}
+                      key="delete"
+                    >
+                      <Button type="link" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>,
+                  ]}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text strong style={{ fontSize: 16 }}>{debt.debtor}</Text>
+                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>Qaytarildi</Tag>}
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Text type="secondary">Berilgan:</Text>
+                      <Text strong>{formatMoney(debt.amount, debt.currency)}</Text>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Text type="secondary">Qaytarilgan:</Text>
+                      <Text style={{ color: '#52c41a' }} strong>{formatMoney(debt.paidAmount, debt.currency)}</Text>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Text type="secondary">Qoldiq:</Text>
+                      <Text type="danger" strong>{formatMoney(debt.remainingDebt, debt.currency)}</Text>
+                    </div>
+                  </div>
+
+                  <Progress
+                    percent={percent}
+                    size="small"
+                    strokeColor={isDone ? '#52c41a' : '#1677ff'}
+                    format={(p) => `${p}%`}
+                  />
+
+                  <div style={{ marginTop: 4 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {formatDate(debt.date)}
+                      {debt.description && ` · ${debt.description}`}
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+      )}
+
+      {/* Create lent debt modal */}
+      <Modal
+        title="Qarz berish"
+        open={debtModalOpen}
+        onOk={handleCreateDebt}
+        onCancel={() => { setDebtModalOpen(false); debtForm.resetFields(); }}
+        confirmLoading={createMutation.isPending}
+        okText="Saqlash"
+        cancelText="Bekor qilish"
+      >
+        <Form form={debtForm} layout="vertical">
+          <Form.Item name="debtor" label="Kimga qarz berildi" rules={[{ required: true, message: "Ismni kiriting" }]}>
+            <Input placeholder="Ism" />
+          </Form.Item>
+          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="currency" label="Valyuta" initialValue="USD">
+            <Select>
+              <Select.Option value="USD">USD</Select.Option>
+              <Select.Option value="RUB">RUB</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="description" label="Izoh">
+            <Input.TextArea rows={2} placeholder="Izoh" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Payment receive modal */}
+      <Modal
+        title="Qarz olish"
+        open={payModalOpen}
+        onOk={handlePaySubmit}
+        onCancel={() => { setPayModalOpen(false); setSelectedDebt(null); }}
+        confirmLoading={payMutation.isPending}
+        okText="Saqlash"
+        cancelText="Bekor qilish"
+      >
+        {selectedDebt && (
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              {selectedDebt.debtor} — Qoldiq: {formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}
+            </Text>
+          </div>
+        )}
+        <Form form={payForm} layout="vertical">
+          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+            <InputNumber style={{ width: '100%' }} min={1} max={selectedDebt?.remainingDebt} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="note" label="Izoh">
+            <Input placeholder="Izoh" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Payment history modal */}
+      <Modal
+        title={selectedDebt ? `${selectedDebt.debtor} — Qaytarish tarixi` : "Qaytarish tarixi"}
+        open={historyModalOpen}
+        onCancel={() => { setHistoryModalOpen(false); setSelectedDebt(null); }}
+        footer={null}
+      >
+        {selectedDebt && (
+          <>
+            <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text type="secondary">Berilgan:</Text>
+                <Text strong>{formatMoney(selectedDebt.amount, selectedDebt.currency)}</Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text type="secondary">Qaytarilgan:</Text>
+                <Text style={{ color: '#52c41a' }} strong>{formatMoney(selectedDebt.paidAmount, selectedDebt.currency)}</Text>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Text type="secondary">Qoldiq:</Text>
+                <Text type="danger" strong>{formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}</Text>
+              </div>
+            </div>
+
+            {selectedDebt.payments?.length > 0 ? (
+              <Timeline
+                items={selectedDebt.payments.map((p) => ({
+                  color: 'green',
+                  children: (
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Text strong style={{ color: '#52c41a' }}>{formatMoney(p.amount, selectedDebt.currency)}</Text>
+                        <Text type="secondary">{formatDate(p.date)}</Text>
+                      </div>
+                      {p.note && <Text type="secondary" style={{ fontSize: 12 }}>{p.note}</Text>}
+                    </div>
+                  ),
+                }))}
+              />
+            ) : (
+              <Empty description="Qaytarishlar yo'q" />
+            )}
+          </>
+        )}
+      </Modal>
+    </>
+  );
+}
+
 // ─── Main page ───
 export default function Debts() {
   return (
@@ -594,6 +906,7 @@ export default function Debts() {
         items={[
           { key: 'customers', label: 'Mijozlar qarzlari', children: <CustomerDebts /> },
           { key: 'my-debts', label: 'Mening qarzdorligim', children: <MyDebtsSection /> },
+          { key: 'lent-debts', label: 'Mendan qarzdarlar', children: <LentDebtsSection /> },
         ]}
         size="large"
         style={{ marginBottom: 16 }}
