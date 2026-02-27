@@ -12,4 +12,9 @@ const transferSchema = new mongoose.Schema({
   note: String
 }, { timestamps: true });
 
+transferSchema.index({ createdAt: -1 });
+transferSchema.index({ status: 1 });
+transferSchema.index({ wagon: 1 });
+transferSchema.index({ customer: 1 });
+
 module.exports = mongoose.model('Transfer', transferSchema);

@@ -7,7 +7,8 @@ exports.getAll = async (req, res, next) => {
   try {
     const sales = await Sale.find()
       .populate('customer')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     res.json(sales);
   } catch (err) { next(err); }
 };
@@ -16,7 +17,8 @@ exports.getOne = async (req, res, next) => {
   try {
     const sale = await Sale.findById(req.params.id)
       .populate('customer')
-      .populate('items.wagon');
+      .populate('items.wagon')
+      .lean();
     if (!sale) return res.status(404).json({ message: 'Sotuv topilmadi' });
     res.json(sale);
   } catch (err) { next(err); }

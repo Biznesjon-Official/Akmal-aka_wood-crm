@@ -6,4 +6,7 @@ const customerSchema = new mongoose.Schema({
   note: { type: String, trim: true }
 }, { timestamps: true });
 
+customerSchema.index({ createdAt: -1 });
+customerSchema.index({ name: 1 });
+
 module.exports = mongoose.model('Customer', customerSchema);

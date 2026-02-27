@@ -1,5 +1,5 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
@@ -16,14 +16,17 @@ export default defineConfig({
     }
   },
   build: {
+    target: 'es2022',
+    cssMinify: true,
+    modulePreload: { polyfill: false },
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          antd: ['antd', '@ant-design/icons'],
+          antd: ['antd'],
           query: ['@tanstack/react-query'],
         },
       },
     },
   },
-})
+});

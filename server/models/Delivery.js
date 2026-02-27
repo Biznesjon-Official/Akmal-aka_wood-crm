@@ -39,4 +39,7 @@ deliverySchema.virtual('profit').get(function () {
   return this.incomeUSD - this.totalExpensesUSD;
 });
 
+deliverySchema.index({ sentDate: -1 });
+deliverySchema.index({ status: 1 });
+
 module.exports = mongoose.model('Delivery', deliverySchema);

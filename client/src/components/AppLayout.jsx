@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Spin } from 'antd';
 import CartDrawer from './CartDrawer';
 import {
   DashboardOutlined,
@@ -48,7 +48,9 @@ export default function AppLayout() {
       </Sider>
       <Layout>
         <Content style={{ margin: 16, padding: 24, background: '#fff', borderRadius: 8, minHeight: 280 }}>
-          <Outlet />
+          <Suspense fallback={<div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>}>
+            <Outlet />
+          </Suspense>
         </Content>
       </Layout>
       <CartDrawer />

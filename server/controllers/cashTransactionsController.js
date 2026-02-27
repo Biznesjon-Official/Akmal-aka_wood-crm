@@ -14,7 +14,8 @@ exports.getAll = async (req, res, next) => {
     }
     const transactions = await CashTransaction.find(filter)
       .populate('source', 'name')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
     res.json(transactions);
   } catch (err) { next(err); }
 };
@@ -28,7 +29,7 @@ exports.create = async (req, res, next) => {
 
 exports.getBalance = async (req, res, next) => {
   try {
-    const transactions = await CashTransaction.find();
+    const transactions = await CashTransaction.find().lean();
     const balance = { USD: 0, RUB: 0 };
     transactions.forEach(tx => {
       const key = tx.currency === 'RUB' ? 'RUB' : 'USD';
@@ -48,7 +49,7 @@ exports.getReport = async (req, res, next) => {
       if (from) filter.date.$gte = new Date(from);
       if (to) filter.date.$lte = new Date(to);
     }
-    const transactions = await CashTransaction.find(filter);
+    const transactions = await CashTransaction.find(filter).lean();
     const report = { kirim: { USD: 0, RUB: 0 }, chiqim: { USD: 0, RUB: 0 }, byCategory: {} };
     transactions.forEach(tx => {
       const key = tx.currency === 'RUB' ? 'RUB' : 'USD';

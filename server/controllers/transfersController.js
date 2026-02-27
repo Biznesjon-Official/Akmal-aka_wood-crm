@@ -8,7 +8,8 @@ exports.getAll = async (req, res, next) => {
     const transfers = await Transfer.find()
       .populate('wagon')
       .populate('customer')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
     res.json(transfers);
   } catch (err) { next(err); }
 };
@@ -17,7 +18,8 @@ exports.getOne = async (req, res, next) => {
   try {
     const transfer = await Transfer.findById(req.params.id)
       .populate('wagon')
-      .populate('customer');
+      .populate('customer')
+      .lean();
     if (!transfer) return res.status(404).json({ message: 'Topilmadi' });
     res.json(transfer);
   } catch (err) { next(err); }
@@ -91,7 +93,7 @@ exports.convertCurrency = async (req, res, next) => {
 
 exports.getConversions = async (req, res, next) => {
   try {
-    const conversions = await CurrencyConversion.find().sort({ date: -1 });
+    const conversions = await CurrencyConversion.find().sort({ date: -1 }).lean();
     res.json(conversions);
   } catch (err) { next(err); }
 };
@@ -131,7 +133,7 @@ exports.createTopUp = async (req, res, next) => {
 
 exports.getTopUps = async (req, res, next) => {
   try {
-    const topUps = await TopUp.find().sort({ date: -1 });
+    const topUps = await TopUp.find().sort({ date: -1 }).lean();
     res.json(topUps);
   } catch (err) { next(err); }
 };

@@ -37,7 +37,7 @@ exports.getAll = async (req, res, next) => {
       if (startDate) filter.sentDate.$gte = new Date(startDate);
       if (endDate) filter.sentDate.$lte = new Date(endDate);
     }
-    const wagons = await Wagon.find(filter).sort({ createdAt: -1 });
+    const wagons = await Wagon.find(filter).sort({ createdAt: -1 }).lean();
     res.json(wagons);
   } catch (err) { next(err); }
 };

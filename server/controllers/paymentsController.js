@@ -9,7 +9,8 @@ exports.getAll = async (req, res, next) => {
     const payments = await Payment.find(filter)
       .populate('customer')
       .populate('sale')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
     res.json(payments);
   } catch (err) { next(err); }
 };

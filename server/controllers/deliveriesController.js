@@ -43,7 +43,7 @@ exports.getAll = async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    const deliveries = await Delivery.find(filter).sort({ sentDate: -1 });
+    const deliveries = await Delivery.find(filter).sort({ sentDate: -1 }).lean({ virtuals: true });
     res.json(deliveries);
   } catch (err) { next(err); }
 };

@@ -4,7 +4,7 @@ const Payment = require('../models/Payment');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 });
+    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
     res.json(customers);
   } catch (err) { next(err); }
 };
@@ -47,15 +47,16 @@ exports.getSales = async (req, res, next) => {
   try {
     const sales = await Sale.find({ customer: req.params.id })
       .populate('customer')
-      .sort({ date: -1 });
+      .sort({ date: -1 })
+      .lean();
     res.json(sales);
   } catch (err) { next(err); }
 };
 
 exports.getDebts = async (req, res, next) => {
   try {
-    const sales = await Sale.find({ customer: req.params.id });
-    const payments = await Payment.find({ customer: req.params.id });
+    const sales = await Sale.find({ customer: req.params.id }).lean();
+    const payments = await Payment.find({ customer: req.params.id }).lean();
     const paymentsBySale = {};
     payments.forEach(p => {
       paymentsBySale[p.sale.toString()] = (paymentsBySale[p.sale.toString()] || 0) + p.amount;

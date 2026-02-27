@@ -1,10 +1,11 @@
-import { lazy, Suspense } from 'react';
+import { lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ConfigProvider, Spin } from 'antd';
+import { ConfigProvider } from 'antd';
 import { CartProvider } from './context/CartContext';
 import AppLayout from './components/AppLayout';
 import ErrorBoundary from './components/ErrorBoundary';
+import { getDashboardStats } from './api';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Wagons = lazy(() => import('./pages/Wagons'));
@@ -17,8 +18,6 @@ const Cash = lazy(() => import('./pages/Cash'));
 const Transfers = lazy(() => import('./pages/Transfers'));
 const Deliveries = lazy(() => import('./pages/Deliveries'));
 
-const PageLoader = <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -30,14 +29,24 @@ const queryClient = new QueryClient({
   },
 });
 
+// Prefetch dashboard data immediately
+queryClient.prefetchQuery({
+  queryKey: ['dashboard'],
+  queryFn: getDashboardStats,
+});
+
+const theme = {
+  cssVar: true,
+  hashed: false,
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <CartProvider>
-        <ConfigProvider>
+        <ConfigProvider theme={theme}>
           <BrowserRouter>
-          <Suspense fallback={PageLoader}>
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Dashboard />} />
@@ -53,7 +62,6 @@ export default function App() {
               <Route path="*" element={<Navigate to="/" />} />
             </Route>
           </Routes>
-          </Suspense>
           </BrowserRouter>
         </ConfigProvider>
       </CartProvider>

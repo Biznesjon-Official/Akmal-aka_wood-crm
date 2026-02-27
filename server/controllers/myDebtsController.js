@@ -3,7 +3,7 @@ const CashTransaction = require('../models/CashTransaction');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const debts = await MyDebt.find().sort({ date: -1 });
+    const debts = await MyDebt.find().sort({ date: -1 }).lean({ virtuals: true });
     res.json(debts);
   } catch (err) { next(err); }
 };

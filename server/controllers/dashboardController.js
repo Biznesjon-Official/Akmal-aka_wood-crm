@@ -22,8 +22,8 @@ exports.getStats = async (req, res, next) => {
       CashTransaction.aggregate([
         { $group: { _id: '$currency', kirim: { $sum: { $cond: [{ $eq: ['$type', 'kirim'] }, '$amount', 0] } }, chiqim: { $sum: { $cond: [{ $eq: ['$type', 'chiqim'] }, '$amount', 0] } } } }
       ]),
-      Sale.find().populate('customer').sort({ createdAt: -1 }).limit(5),
-      Wagon.find({ status: 'kelyapti' }).sort({ sentDate: -1 }).limit(5),
+      Sale.find().populate('customer').sort({ createdAt: -1 }).limit(5).lean(),
+      Wagon.find({ status: 'kelyapti' }).sort({ sentDate: -1 }).limit(5).lean(),
     ]);
 
     // Build sales/debt by currency

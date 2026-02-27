@@ -86,4 +86,8 @@ wagonSchema.pre('save', async function () {
   }
 });
 
+wagonSchema.index({ status: 1 });
+wagonSchema.index({ createdAt: -1 });
+wagonSchema.index({ sentDate: -1 });
+
 module.exports = mongoose.model('Wagon', wagonSchema);

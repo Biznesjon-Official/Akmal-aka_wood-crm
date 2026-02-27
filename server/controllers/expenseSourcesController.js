@@ -2,7 +2,7 @@ const ExpenseSource = require('../models/ExpenseSource');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const sources = await ExpenseSource.find().sort({ name: 1 });
+    const sources = await ExpenseSource.find().sort({ name: 1 }).lean();
     res.json(sources);
   } catch (err) { next(err); }
 };
