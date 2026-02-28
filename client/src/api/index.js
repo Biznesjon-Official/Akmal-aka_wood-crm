@@ -92,6 +92,8 @@ export const createExpenseSource = (data) =>
   api.post("/expense-sources", data).then((r) => r.data);
 export const updateExpenseSource = (id, data) =>
   api.put(`/expense-sources/${id}`, data).then((r) => r.data);
+export const getWagonProfitSummary = (ids) =>
+  api.get('/wagons/profit-summary', { params: ids?.length ? { ids: ids.join(',') } : {} }).then((r) => r.data);
 export const deleteExpenseSource = (id) =>
   api.delete(`/expense-sources/${id}`).then((r) => r.data);
 

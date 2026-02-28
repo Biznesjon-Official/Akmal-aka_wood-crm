@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, InputNumber, Select, DatePicker,
-  Input, message, Tag, Card, Row, Col, Statistic, Space, Popconfirm, List, Switch, Segmented, Typography,
+  Input, message, Tag, Card, Row, Col, Statistic, Space, Popconfirm, List, Switch, Segmented, Typography, Divider,
 } from 'antd';
-import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
+import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, TeamOutlined, DollarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getCashTransactions, createCashTransaction, getCashBalance,
   getExpenseSources, createExpenseSource, updateExpenseSource, deleteExpenseSource,
+  getWagons, getWagonProfitSummary,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
@@ -58,6 +59,11 @@ export default function Cash() {
   const [newSourceName, setNewSourceName] = useState('');
   const [editingSource, setEditingSource] = useState(null);
   const [editingName, setEditingName] = useState('');
+  const [editingPercent, setEditingPercent] = useState(0);
+  const [partnerCalcOpen, setPartnerCalcOpen] = useState(false);
+  const [selectedWagonIds, setSelectedWagonIds] = useState([]);
+  const [profitData, setProfitData] = useState(null);
+  const [calcLoading, setCalcLoading] = useState(false);
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['cash-transactions', filters],
@@ -73,6 +79,10 @@ export default function Cash() {
     queryKey: ['expense-sources'],
     queryFn: getExpenseSources,
   });
+
+  const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: getWagons });
+
+  const partners = sources.filter(s => s.profitPercent > 0);
 
   const invalidateCash = () => {
     queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
@@ -184,7 +194,30 @@ export default function Cash() {
   const handleUpdateSource = () => {
     const name = editingName.trim();
     if (!name || !editingSource) return;
-    updateSourceMutation.mutate({ id: editingSource, name });
+    updateSourceMutation.mutate({ id: editingSource, name, profitPercent: editingPercent || 0 });
+  };
+
+  const handleCalcProfit = async () => {
+    setCalcLoading(true);
+    try {
+      const data = await getWagonProfitSummary(selectedWagonIds);
+      setProfitData(data);
+    } catch { message.error('Xatolik'); }
+    finally { setCalcLoading(false); }
+  };
+
+  const handlePayPartner = async (partner, amount) => {
+    await createMutation.mutateAsync({
+      type: 'chiqim',
+      source: partner._id,
+      amount,
+      currency: 'USD',
+      account: 'USD_account',
+      description: `Sherik ulushi: ${partner.name} (${partner.profitPercent}%)`,
+      date: new Date().toISOString(),
+    });
+    invalidateCash();
+    message.success(`${partner.name}ga to'lov qilindi`);
   };
 
   const chiqimSourceOptions = sources.map((s) => ({ value: s._id, label: s.name }));
@@ -255,6 +288,9 @@ export default function Cash() {
           <RangePicker onChange={handleDateRange} />
         </Space>
         <Space>
+          <Button icon={<TeamOutlined />} onClick={() => { setProfitData(null); setSelectedWagonIds([]); setPartnerCalcOpen(true); }}>
+            Sherik hisob
+          </Button>
           <Button icon={<SettingOutlined />} onClick={() => setSourcesModalOpen(true)}>
             Chiqim manbalari
           </Button>
@@ -380,7 +416,7 @@ export default function Cash() {
                     ]
                     : [
                       <Button size="small" type="text" key="edit" icon={<EditOutlined />}
-                        onClick={() => { setEditingSource(item._id); setEditingName(item.name); }} />,
+                        onClick={() => { setEditingSource(item._id); setEditingName(item.name); setEditingPercent(item.profitPercent || 0); }} />,
                       <Popconfirm key="delete" title="O'chirishni tasdiqlaysizmi?"
                         onConfirm={() => deleteSourceMutation.mutate(item._id)}>
                         <Button size="small" type="text" danger icon={<DeleteOutlined />} />
@@ -389,15 +425,114 @@ export default function Cash() {
               }
             >
               {editingSource === item._id ? (
-                <Input size="small" value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  onPressEnter={handleUpdateSource} style={{ width: '100%' }} />
+                <Space style={{ width: '100%' }}>
+                  <Input size="small" value={editingName} onChange={(e) => setEditingName(e.target.value)} style={{ width: 160 }} />
+                  <InputNumber size="small" value={editingPercent} onChange={setEditingPercent} min={0} max={100} style={{ width: 90 }} addonAfter="%" placeholder="Foiz" />
+                </Space>
               ) : (
-                <span>{item.name} {item.isDefault && <Tag color="blue" style={{ marginLeft: 8 }}>Default</Tag>}</span>
+                <span>
+                  {item.name}
+                  {item.profitPercent > 0 && <Tag color="purple" style={{ marginLeft: 8 }}>{item.profitPercent}%</Tag>}
+                  {item.isDefault && <Tag color="blue" style={{ marginLeft: 4 }}>Default</Tag>}
+                </span>
               )}
             </List.Item>
           )}
         />
+      </Modal>
+
+      {/* Partner profit calculation modal */}
+      <Modal
+        title={<><TeamOutlined /> Sherik hisob-kitob</>}
+        open={partnerCalcOpen}
+        onCancel={() => setPartnerCalcOpen(false)}
+        footer={null}
+        width={680}
+      >
+        <div style={{ marginBottom: 12 }}>
+          <Select
+            mode="multiple"
+            style={{ width: '100%' }}
+            placeholder="Vagonlarni tanlang (bo'sh = barchasi)"
+            value={selectedWagonIds}
+            onChange={setSelectedWagonIds}
+            options={wagons.map(w => ({ label: `${w.wagonCode} (${w.status})`, value: w._id }))}
+            showSearch
+            filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+          />
+        </div>
+        <Button type="primary" loading={calcLoading} onClick={handleCalcProfit} style={{ marginBottom: 16 }}>
+          Foydani hisoblash
+        </Button>
+
+        {profitData && (
+          <>
+            <Table
+              size="small"
+              pagination={false}
+              style={{ marginBottom: 16 }}
+              dataSource={profitData}
+              rowKey="_id"
+              columns={[
+                { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode' },
+                { title: 'Xarajat', dataIndex: 'totalCostUSD', key: 'cost', render: v => formatMoney(v, 'USD') },
+                { title: 'Daromad', dataIndex: 'totalIncomeUSD', key: 'income', render: v => <Text style={{ color: '#52c41a' }}>{formatMoney(v, 'USD')}</Text> },
+                {
+                  title: 'Sof foyda', dataIndex: 'profitUSD', key: 'profit',
+                  render: v => <Text strong style={{ color: v >= 0 ? '#389e0d' : '#ff4d4f' }}>{formatMoney(v, 'USD')}</Text>,
+                },
+              ]}
+              summary={(rows) => {
+                const totalProfit = rows.reduce((s, r) => s + r.profitUSD, 0);
+                return (
+                  <Table.Summary.Row>
+                    <Table.Summary.Cell index={0}><Text strong>Jami</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={1}><Text strong>{formatMoney(rows.reduce((s, r) => s + r.totalCostUSD, 0), 'USD')}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={2}><Text strong style={{ color: '#52c41a' }}>{formatMoney(rows.reduce((s, r) => s + r.totalIncomeUSD, 0), 'USD')}</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={3}><Text strong style={{ color: totalProfit >= 0 ? '#389e0d' : '#ff4d4f' }}>{formatMoney(totalProfit, 'USD')}</Text></Table.Summary.Cell>
+                  </Table.Summary.Row>
+                );
+              }}
+            />
+
+            {partners.length > 0 && (
+              <>
+                <Divider>Sherik ulushlar</Divider>
+                {partners.map(partner => {
+                  const totalProfit = profitData.reduce((s, r) => s + r.profitUSD, 0);
+                  const share = Math.max(0, totalProfit) * partner.profitPercent / 100;
+                  return (
+                    <Card key={partner._id} size="small" style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <Text strong>{partner.name}</Text>
+                          <Tag color="purple" style={{ marginLeft: 8 }}>{partner.profitPercent}%</Tag>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                          <Text strong style={{ fontSize: 16, color: '#389e0d' }}>
+                            <DollarOutlined /> {formatMoney(share, 'USD')}
+                          </Text>
+                          <Popconfirm
+                            title={`${partner.name}ga ${formatMoney(share, 'USD')} to'lansinmi?`}
+                            onConfirm={() => handlePayPartner(partner, share)}
+                          >
+                            <Button size="small" type="primary" disabled={share <= 0}>
+                              To'lov qilish
+                            </Button>
+                          </Popconfirm>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </>
+            )}
+
+            {partners.length === 0 && (
+              <Text type="secondary">Foiz belgilangan sherik yo'q. "Chiqim manbalari" da sherik foizini belgilang.</Text>
+            )}
+          </>
+        )}
       </Modal>
     </div>
   );

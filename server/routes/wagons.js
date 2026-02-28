@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const c = require('../controllers/wagonsController');
 
+router.get('/profit-summary', c.profitSummary);
 router.get('/', c.getAll);
 router.post('/', c.create);
 router.get('/:id', c.getOne);

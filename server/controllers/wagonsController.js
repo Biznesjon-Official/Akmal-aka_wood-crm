@@ -112,3 +112,45 @@ exports.updateExpenses = async (req, res, next) => {
     res.json(wagon);
   } catch (err) { next(err); }
 };
+
+// Profit summary for selected wagons (for partner share calculation)
+exports.profitSummary = async (req, res, next) => {
+  try {
+    const ids = req.query.ids ? req.query.ids.split(',') : [];
+    const Sale = require('../models/Sale');
+    const Settings = require('../models/Settings');
+
+    const wagons = ids.length
+      ? await Wagon.find({ _id: { $in: ids } }).lean()
+      : await Wagon.find().lean();
+
+    const rate = await Settings.getExchangeRate();
+
+    // Sum sales income per wagon
+    const sales = await Sale.find({ 'items.wagon': { $in: wagons.map(w => w._id) } }).lean();
+    const incomeByWagon = {};
+    for (const sale of sales) {
+      for (const item of sale.items) {
+        const wid = item.wagon.toString();
+        incomeByWagon[wid] = (incomeByWagon[wid] || 0) + (item.totalAmount || 0);
+      }
+    }
+
+    const result = wagons.map(w => {
+      const usdCost = w.expenses.filter(e => e.currency === 'USD').reduce((s, e) => s + e.amount, 0);
+      const rubCost = w.expenses.filter(e => e.currency === 'RUB').reduce((s, e) => s + e.amount, 0);
+      const totalCostUSD = usdCost + (rate > 0 ? rubCost / rate : 0);
+      const totalIncomeUSD = incomeByWagon[w._id.toString()] || 0;
+      return {
+        _id: w._id,
+        wagonCode: w.wagonCode,
+        status: w.status,
+        totalCostUSD: Math.round(totalCostUSD * 100) / 100,
+        totalIncomeUSD: Math.round(totalIncomeUSD * 100) / 100,
+        profitUSD: Math.round((totalIncomeUSD - totalCostUSD) * 100) / 100,
+      };
+    });
+
+    res.json(result);
+  } catch (err) { next(err); }
+};

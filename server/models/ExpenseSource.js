@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const expenseSourceSchema = new mongoose.Schema({
   name: { type: String, required: true, unique: true, trim: true },
   isDefault: { type: Boolean, default: false },
+  profitPercent: { type: Number, default: 0, min: 0, max: 100 }, // partner profit share %
 }, { timestamps: true });
 
 expenseSourceSchema.statics.ensureDefaults = async function () {

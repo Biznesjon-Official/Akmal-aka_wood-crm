@@ -24,6 +24,7 @@ exports.update = async (req, res, next) => {
     const source = await ExpenseSource.findById(req.params.id);
     if (!source) return res.status(404).json({ message: 'Manba topilmadi' });
     source.name = req.body.name;
+    if (req.body.profitPercent !== undefined) source.profitPercent = req.body.profitPercent;
     await source.save();
     res.json(source);
   } catch (err) {
