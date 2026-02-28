@@ -19,8 +19,11 @@ const deliverySchema = new mongoose.Schema({
   cargoWeight: Number,
 
   // Per-ton tariffs (USD/ton) — mijoz qarzi
+  uzCode: String,
   uzRate: { type: Number, default: 0 },
+  kzCode: String,
   kzRate: { type: Number, default: 0 },
+  ogirlik: { type: Number, default: 0 },  // weight loss (ton) — reduces effective weight for UZ & KZ
 
   // Fixed USD debts
   avgExpense: { type: Number, default: 0 },
@@ -31,12 +34,16 @@ const deliverySchema = new mongoose.Schema({
   payments: [paymentSchema],
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 
+deliverySchema.virtual('effectiveWeight').get(function () {
+  return Math.max(0, (this.cargoWeight || 0) - (this.ogirlik || 0));
+});
+
 deliverySchema.virtual('uzTotal').get(function () {
-  return (this.uzRate || 0) * (this.cargoWeight || 0);
+  return (this.uzRate || 0) * this.effectiveWeight;
 });
 
 deliverySchema.virtual('kzTotal').get(function () {
-  return (this.kzRate || 0) * (this.cargoWeight || 0);
+  return (this.kzRate || 0) * this.effectiveWeight;
 });
 
 // Total debt = what customer owes us

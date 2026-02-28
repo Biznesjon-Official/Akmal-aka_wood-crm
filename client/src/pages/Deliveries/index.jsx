@@ -251,8 +251,8 @@ export default function Deliveries() {
 
           <div style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
             <Descriptions size="small" column={2} labelStyle={{ color: '#888', fontSize: 11 }} contentStyle={{ fontSize: 11, fontWeight: 600 }}>
-              {d.uzRate > 0 && <Descriptions.Item label="UZ">${d.uzRate}/t</Descriptions.Item>}
-              {d.kzRate > 0 && <Descriptions.Item label="KZ">${d.kzRate}/t</Descriptions.Item>}
+              {d.uzRate > 0 && <Descriptions.Item label={d.uzCode ? `UZ (${d.uzCode})` : 'UZ'}>${d.uzRate}/t</Descriptions.Item>}
+              {d.kzRate > 0 && <Descriptions.Item label={d.kzCode ? `KZ (${d.kzCode})` : 'KZ'}>${d.kzRate}/t</Descriptions.Item>}
               {d.avgExpense > 0 && <Descriptions.Item label="AVG">{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
               {d.kodExpense > 0 && <Descriptions.Item label="Kod">{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
               {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
@@ -402,28 +402,43 @@ export default function Deliveries() {
             </Col>
           </Row>
 
-          <Row gutter={12}>
+          <Form.Item name="cargoType" label="Ichida nima">
+            <Input placeholder="Yog'och, metall..." />
+          </Form.Item>
+
+          <Title level={5} style={{ margin: '8px 0 8px' }}>Chegara to'lovlari (mijoz qarzi)</Title>
+          <Row gutter={12} style={{ marginBottom: 0 }}>
             <Col span={12}>
-              <Form.Item name="cargoType" label="Ichida nima">
-                <Input placeholder="Yog'och, metall..." />
+              <Form.Item name="cargoWeight" label="Yuk og'irligi (t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonAfter="t" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="cargoWeight" label="Hajmi (tonna)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+              <Form.Item name="ogirlik" label="Og'irlik yo'qotish (t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonAfter="t" />
               </Form.Item>
             </Col>
           </Row>
-
-          <Title level={5} style={{ margin: '8px 0 12px' }}>Chegara to'lovlari (mijoz qarzi)</Title>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="uzRate" label="UZ (USD/tonna)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+              <Form.Item name="uzCode" label="UZ kodi" style={{ marginBottom: 8 }}>
+                <Input placeholder="Kod raqami" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="kzRate" label="KZ (USD/tonna)">
+              <Form.Item name="uzRate" label="UZ (USD/t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="kzCode" label="KZ kodi" style={{ marginBottom: 8 }}>
+                <Input placeholder="Kod raqami" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="kzRate" label="KZ (USD/t)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
               </Form.Item>
             </Col>
@@ -449,9 +464,11 @@ export default function Deliveries() {
           {/* Live total */}
           <Form.Item noStyle shouldUpdate>
             {() => {
-              const w = form.getFieldValue('cargoWeight') || 0;
-              const uz = (form.getFieldValue('uzRate') || 0) * w;
-              const kz = (form.getFieldValue('kzRate') || 0) * w;
+              const weight = form.getFieldValue('cargoWeight') || 0;
+              const loss = form.getFieldValue('ogirlik') || 0;
+              const eff = Math.max(0, weight - loss);
+              const uz = (form.getFieldValue('uzRate') || 0) * eff;
+              const kz = (form.getFieldValue('kzRate') || 0) * eff;
               const avg = form.getFieldValue('avgExpense') || 0;
               const kod = form.getFieldValue('kodExpense') || 0;
               const pr = form.getFieldValue('prastoy') || 0;
@@ -459,6 +476,11 @@ export default function Deliveries() {
               if (!total) return null;
               return (
                 <Card size="small" style={{ background: '#fff7e6' }}>
+                  {eff !== weight && weight > 0 && (
+                    <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
+                      Effektiv og'irlik: {weight} − {loss} = <strong>{eff} t</strong>
+                    </div>
+                  )}
                   <Row gutter={8}>
                     {uz > 0 && <Col span={12}><Text type="secondary">UZ: </Text><Text strong>{formatMoney(uz, 'USD')}</Text></Col>}
                     {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
