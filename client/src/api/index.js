@@ -124,6 +124,8 @@ export const deleteDelivery = (id) =>
   api.delete(`/deliveries/${id}`).then((r) => r.data);
 export const markDelivered = (id) =>
   api.put(`/deliveries/${id}/deliver`).then((r) => r.data);
+export const addDeliveryPayment = (id, data) =>
+  api.post(`/deliveries/${id}/payment`, data).then((r) => r.data);
 
 // Settings
 export const getExchangeRate = () =>

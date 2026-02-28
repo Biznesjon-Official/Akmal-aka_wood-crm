@@ -773,7 +773,7 @@ export default function Wagons() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createType, setCreateType] = useState('vagon');
   const [selectedWagon, setSelectedWagon] = useState(null);
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
   const [sellWagon, setSellWagon] = useState(null);
 
   const { data: wagons = [], isLoading } = useQuery({ queryKey: ['wagons', filters], queryFn: () => getWagons(filters) });
@@ -870,6 +870,31 @@ export default function Wagons() {
           <Button icon={<CarOutlined />} onClick={() => { setCreateType('mashina'); setCreateOpen(true); }}>Yangi mashina</Button>
         </Space>
       </div>
+
+      <Card className="summary-card" style={{ marginBottom: 16 }}>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami</span>
+            <span className="summary-stat-value">{wagons.length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Kelyapti</span>
+            <span className="summary-stat-value">{wagons.filter(w => w.status === 'kelyapti').length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Faol</span>
+            <span className="summary-stat-value highlight">{activeWagons.filter(w => w.status === 'faol').length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Arxiv</span>
+            <span className="summary-stat-value">{archivedWagons.length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami m³</span>
+            <span className="summary-stat-value">{formatM3(wagons.reduce((s, w) => s + (w.totalM3 || 0), 0))}</span>
+          </div>
+        </div>
+      </Card>
 
       <Tabs defaultActiveKey="active" items={[
         {

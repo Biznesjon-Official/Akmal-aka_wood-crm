@@ -17,7 +17,7 @@ const { Text } = Typography;
 
 export default function Sales() {
   const [open, setOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { items: cartItems, removeItem, updateQuantity, clearCart, cartCount } = useCart();
@@ -381,6 +381,27 @@ export default function Sales() {
           Yangi sotuv {cartCount > 0 && `(${cartCount})`}
         </Button>
       </div>
+
+      <Card className="summary-card" style={{ marginBottom: 16 }}>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami sotuvlar</span>
+            <span className="summary-stat-value">{sales.length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami summa</span>
+            <span className="summary-stat-value highlight">{formatMoney(sales.reduce((s, x) => s + (x.totalAmount || 0), 0), 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">To'langan</span>
+            <span className="summary-stat-value" style={{ color: '#52c41a' }}>{formatMoney(sales.reduce((s, x) => s + (x.paidAmount || 0), 0), 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Qarz</span>
+            <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(sales.reduce((s, x) => s + Math.max(0, (x.totalAmount || 0) - (x.paidAmount || 0)), 0), 'USD')}</span>
+          </div>
+        </div>
+      </Card>
 
       {viewMode === 'card' ? renderSaleCards() : (
         <Table

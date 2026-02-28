@@ -54,7 +54,7 @@ function SellPopover({ bundle, children }) {
 
 export default function Warehouse() {
   const [filters, setFilters] = useState({ thickness: null, width: null, length: null });
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
 
   const { data: wagons, isLoading } = useQuery({
     queryKey: ['wagons'],

@@ -42,7 +42,7 @@ const accountOptions = [
 
 export default function Cash() {
   const queryClient = useQueryClient();
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [sourcesModalOpen, setSourcesModalOpen] = useState(false);

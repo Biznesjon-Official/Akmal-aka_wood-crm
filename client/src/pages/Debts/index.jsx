@@ -22,7 +22,7 @@ function CustomerDebts() {
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
 
   const { data: salesRaw, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
@@ -173,25 +173,32 @@ function CustomerDebts() {
 
   return (
     <>
-      <Card style={{ marginBottom: 16 }}>
-        <Space size="large" align="center">
-          <Title level={4} style={{ margin: 0 }}>Mijozlar qarzlari</Title>
-          <Segmented value={viewMode} onChange={setViewMode}
-            options={[
-              { value: 'card', icon: <AppstoreOutlined /> },
-              { value: 'table', icon: <BarsOutlined /> },
-            ]} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Segmented value={viewMode} onChange={setViewMode}
+          options={[
+            { value: 'card', icon: <AppstoreOutlined /> },
+            { value: 'table', icon: <BarsOutlined /> },
+          ]} />
+      </div>
+      <Card className="summary-card" style={{ marginBottom: 16 }}>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span className="summary-stat-label">Qarzdor mijozlar</span>
+            <span className="summary-stat-value">{customerDebts.length}</span>
+          </div>
           {totalDebtUSD > 0 && (
-            <Tag color="red" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalDebtUSD, 'USD')}
-            </Tag>
+            <div className="summary-stat">
+              <span className="summary-stat-label">Jami qarz (USD)</span>
+              <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtUSD, 'USD')}</span>
+            </div>
           )}
           {totalDebtRUB > 0 && (
-            <Tag color="red" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalDebtRUB, 'RUB')}
-            </Tag>
+            <div className="summary-stat">
+              <span className="summary-stat-label">Jami qarz (RUB)</span>
+              <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtRUB, 'RUB')}</span>
+            </div>
           )}
-        </Space>
+        </div>
       </Card>
 
       {viewMode === 'card' ? (

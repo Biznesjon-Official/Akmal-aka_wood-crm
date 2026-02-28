@@ -9,7 +9,7 @@ import '../styles/cards.css';
 const { Text } = Typography;
 
 const Customers = () => {
-  const [viewMode, setViewMode] = useState('card');
+  const [viewMode, setViewMode] = useState('table');
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
@@ -214,6 +214,19 @@ const Customers = () => {
           Mijoz qo'shish
         </Button>
       </div>
+
+      <Card className="summary-card" style={{ marginBottom: 16 }}>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami mijozlar</span>
+            <span className="summary-stat-value highlight">{(customers || []).length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Telefon bor</span>
+            <span className="summary-stat-value">{(customers || []).filter(c => c.phone).length}</span>
+          </div>
+        </div>
+      </Card>
 
       {viewMode === 'card' ? renderCustomerCards() : (
         <Table

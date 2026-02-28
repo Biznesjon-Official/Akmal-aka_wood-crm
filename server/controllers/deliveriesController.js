@@ -1,56 +1,21 @@
 const Delivery = require('../models/Delivery');
 const CashTransaction = require('../models/CashTransaction');
-const Settings = require('../models/Settings');
-
-// Sync cash transactions for a delivery
-const syncDeliveryCashTransactions = async (delivery) => {
-  await CashTransaction.deleteMany({ relatedDelivery: delivery._id });
-
-  const txns = [];
-
-  // Each expense → chiqim
-  for (const exp of delivery.expenses) {
-    txns.push({
-      type: 'chiqim',
-      category: 'yetkazma',
-      amount: exp.amount,
-      currency: exp.currency,
-      account: exp.currency === 'RUB' ? 'RUB_account' : 'USD_account',
-      description: `Yetkazma: ${delivery.wagonCode} - ${exp.description}`,
-      relatedDelivery: delivery._id,
-      date: delivery.sentDate,
-    });
-  }
-
-  // Income → kirim
-  if (delivery.income > 0) {
-    txns.push({
-      type: 'kirim',
-      category: 'yetkazma',
-      amount: delivery.income,
-      currency: delivery.incomeCurrency,
-      account: delivery.incomeCurrency === 'RUB' ? 'RUB_account' : 'USD_account',
-      description: `Yetkazma daromad: ${delivery.wagonCode}`,
-      relatedDelivery: delivery._id,
-      date: delivery.sentDate,
-    });
-  }
-
-  if (txns.length) await CashTransaction.insertMany(txns);
-};
 
 exports.getAll = async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
-    const deliveries = await Delivery.find(filter).sort({ sentDate: -1 }).lean({ virtuals: true });
+    const deliveries = await Delivery.find(filter)
+      .populate('customer', 'name phone')
+      .sort({ sentDate: -1 })
+      .lean({ virtuals: true });
     res.json(deliveries);
   } catch (err) { next(err); }
 };
 
 exports.getOne = async (req, res, next) => {
   try {
-    const delivery = await Delivery.findById(req.params.id);
+    const delivery = await Delivery.findById(req.params.id).populate('customer', 'name phone');
     if (!delivery) return res.status(404).json({ message: 'Yetkazma topilmadi' });
     res.json(delivery);
   } catch (err) { next(err); }
@@ -58,10 +23,9 @@ exports.getOne = async (req, res, next) => {
 
 exports.create = async (req, res, next) => {
   try {
-    const rate = await Settings.getExchangeRate();
-    const delivery = await Delivery.create({ ...req.body, exchangeRate: rate });
-    await syncDeliveryCashTransactions(delivery);
-    res.status(201).json(delivery);
+    const delivery = await Delivery.create(req.body);
+    const populated = await delivery.populate('customer', 'name phone');
+    res.status(201).json(populated.toJSON());
   } catch (err) { next(err); }
 };
 
@@ -71,8 +35,8 @@ exports.update = async (req, res, next) => {
     if (!delivery) return res.status(404).json({ message: 'Yetkazma topilmadi' });
     Object.assign(delivery, req.body);
     await delivery.save();
-    await syncDeliveryCashTransactions(delivery);
-    res.json(delivery);
+    const populated = await delivery.populate('customer', 'name phone');
+    res.json(populated.toJSON());
   } catch (err) { next(err); }
 };
 
@@ -91,8 +55,43 @@ exports.markDelivered = async (req, res, next) => {
     const delivery = await Delivery.findById(req.params.id);
     if (!delivery) return res.status(404).json({ message: 'Yetkazma topilmadi' });
     delivery.status = 'yetkazildi';
-    delivery.deliveredDate = new Date();
+    delivery.arrivedDate = delivery.arrivedDate || new Date();
     await delivery.save();
-    res.json(delivery);
+    res.json(delivery.toJSON());
+  } catch (err) { next(err); }
+};
+
+// Add customer payment for delivery debt
+exports.addPayment = async (req, res, next) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id).populate('customer', 'name');
+    if (!delivery) return res.status(404).json({ message: 'Yetkazma topilmadi' });
+
+    const { amount, date, note } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Summa noto\'g\'ri' });
+
+    delivery.payments.push({ amount, date: date || new Date(), note });
+
+    // Auto-complete when fully paid
+    const newPaid = delivery.payments.reduce((s, p) => s + p.amount, 0);
+    if (newPaid >= delivery.totalDebt && delivery.status !== 'yakunlandi') {
+      delivery.status = 'yakunlandi';
+    }
+
+    await delivery.save();
+
+    // Cash kirim when customer pays
+    await CashTransaction.create({
+      type: 'kirim',
+      category: 'yetkazma',
+      amount,
+      currency: 'USD',
+      account: 'USD_account',
+      description: `Yetkazma to'lov: ${delivery.wagonCode || ''} — ${delivery.customer?.name || ''}`,
+      relatedDelivery: delivery._id,
+      date: date || new Date(),
+    });
+
+    res.json(delivery.toJSON());
   } catch (err) { next(err); }
 };

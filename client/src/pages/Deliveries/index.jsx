@@ -2,31 +2,35 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select,
-  message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col,
+  message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress,
 } from 'antd';
 import {
-  PlusOutlined, DeleteOutlined, EditOutlined,
-  CheckCircleOutlined, MinusCircleOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getDeliveries, createDelivery, updateDelivery, deleteDelivery, markDelivered } from '../../api';
+import {
+  getDeliveries, createDelivery, updateDelivery, deleteDelivery,
+  markDelivered, addDeliveryPayment, getWagons, getCustomers,
+} from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
-const statusOptions = [
-  { label: 'Barchasi', value: '' },
-  { label: "Yo'lda", value: "yo'lda" },
-  { label: 'Yetkazildi', value: 'yetkazildi' },
-];
+const STATUS_COLOR = { "yo'lda": 'orange', yetkazildi: 'blue', yakunlandi: 'green' };
+const STATUS_LABEL = { "yo'lda": "Yo'lda", yetkazildi: 'Yetkazildi', yakunlandi: 'Yakunlandi' };
+const DEBT_COLOR = { tolanmagan: '#ff4d4f', qisman: '#fa8c16', toliq: '#52c41a' };
+const DEBT_LABEL = { tolanmagan: "To'lanmagan", qisman: 'Qisman', toliq: "To'liq" };
 
 export default function Deliveries() {
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
+  const [payModalOpen, setPayModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [payTarget, setPayTarget] = useState(null);
   const [form] = Form.useForm();
-  const [viewMode, setViewMode] = useState('card');
+  const [payForm] = Form.useForm();
+  const [viewMode, setViewMode] = useState('table');
   const [statusFilter, setStatusFilter] = useState('');
 
   const invalidate = () => {
@@ -39,6 +43,12 @@ export default function Deliveries() {
     queryKey: ['deliveries', statusFilter],
     queryFn: () => getDeliveries(statusFilter ? { status: statusFilter } : {}),
   });
+
+  const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: getWagons });
+  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
+
+  const wagonOptions = wagons.map(w => ({ label: w.wagonCode || w._id, value: w._id, code: w.wagonCode }));
+  const customerOptions = customers.map(c => ({ label: c.name, value: c._id }));
 
   const createMut = useMutation({
     mutationFn: createDelivery,
@@ -59,18 +69,20 @@ export default function Deliveries() {
 
   const deliverMut = useMutation({
     mutationFn: markDelivered,
-    onSuccess: () => { invalidate(); message.success('Yetkazildi deb belgilandi'); },
+    onSuccess: () => { invalidate(); message.success('Yetkazildi'); },
   });
 
-  const closeModal = () => {
-    setModalOpen(false);
-    setEditing(null);
-    form.resetFields();
-  };
+  const payMut = useMutation({
+    mutationFn: ({ id, data }) => addDeliveryPayment(id, data),
+    onSuccess: () => { invalidate(); message.success("To'lov qo'shildi"); setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); },
+    onError: () => message.error('Xatolik'),
+  });
+
+  const closeModal = () => { setModalOpen(false); setEditing(null); form.resetFields(); };
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ sentDate: dayjs(), expenses: [{}], incomeCurrency: 'USD' });
+    form.setFieldsValue({ sentDate: dayjs() });
     setEditing(null);
     setModalOpen(true);
   };
@@ -79,60 +91,101 @@ export default function Deliveries() {
     setEditing(record);
     form.setFieldsValue({
       ...record,
+      wagon: record.wagon?._id || record.wagon,
+      customer: record.customer?._id || record.customer,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
-      deliveredDate: record.deliveredDate ? dayjs(record.deliveredDate) : null,
-      expenses: record.expenses?.length ? record.expenses : [{}],
+      arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
     });
     setModalOpen(true);
+  };
+
+  const openPay = (record) => {
+    setPayTarget(record);
+    payForm.setFieldsValue({ date: dayjs(), amount: record.remainingDebt || 0 });
+    setPayModalOpen(true);
   };
 
   const handleSubmit = (values) => {
     const data = {
       ...values,
       sentDate: values.sentDate?.toISOString(),
-      deliveredDate: values.deliveredDate?.toISOString(),
+      arrivedDate: values.arrivedDate?.toISOString(),
     };
-    if (editing) {
-      updateMut.mutate({ id: editing._id, data });
-    } else {
-      createMut.mutate(data);
-    }
+    if (editing) updateMut.mutate({ id: editing._id, data });
+    else createMut.mutate(data);
   };
 
-  // Summary
-  const totalExpenses = deliveries.reduce((s, d) => s + (d.totalExpensesUSD || 0), 0);
-  const totalIncome = deliveries.reduce((s, d) => s + (d.incomeUSD || 0), 0);
-  const totalProfit = totalIncome - totalExpenses;
+  // Summary stats
+  const totalDebt = deliveries.reduce((s, d) => s + (d.totalDebt || 0), 0);
+  const totalPaid = deliveries.reduce((s, d) => s + (d.paidAmount || 0), 0);
+  const totalRemaining = deliveries.reduce((s, d) => s + (d.remainingDebt || 0), 0);
 
   const columns = [
-    { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode', render: (v) => <Text strong>{v}</Text> },
     {
-      title: 'Marshrut', key: 'route',
-      render: (_, r) => `${r.origin || '—'} → ${r.destination || '—'}`,
+      title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode',
+      render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v || '—'}</Text>,
     },
-    { title: 'Mijoz', dataIndex: 'customer', key: 'customer' },
-    { title: 'Jo\'natilgan', dataIndex: 'sentDate', key: 'sentDate', render: formatDate },
+    {
+      title: 'Mijoz', key: 'customer',
+      render: (_, r) => <Text>{r.customer?.name || '—'}</Text>,
+    },
+    {
+      title: 'Sanalar', key: 'dates',
+      render: (_, r) => (
+        <div style={{ fontSize: 12 }}>
+          <div>{formatDate(r.sentDate)}</div>
+          {r.arrivedDate && <div style={{ color: '#52c41a' }}>{formatDate(r.arrivedDate)}</div>}
+        </div>
+      ),
+    },
+    {
+      title: 'Yuk', key: 'cargo',
+      render: (_, r) => r.cargoType ? (
+        <div style={{ fontSize: 12 }}>
+          <div>{r.cargoType}</div>
+          {r.cargoWeight && <div style={{ color: '#888' }}>{r.cargoWeight} t</div>}
+        </div>
+      ) : '—',
+    },
     {
       title: 'Status', dataIndex: 'status', key: 'status',
-      render: (v) => <Tag color={v === 'yetkazildi' ? 'green' : 'orange'}>{v === 'yetkazildi' ? 'Yetkazildi' : "Yo'lda"}</Tag>,
+      render: (v) => <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>,
     },
     {
-      title: 'Xarajat', key: 'expenses',
-      render: (_, r) => formatMoney(r.totalExpensesUSD, 'USD'),
+      title: 'Jami qarz', key: 'totalDebt',
+      render: (_, r) => <Text strong>{formatMoney(r.totalDebt, 'USD')}</Text>,
     },
     {
-      title: 'Daromad', key: 'income',
-      render: (_, r) => <Text style={{ color: '#389e0d' }}>{formatMoney(r.incomeUSD, 'USD')}</Text>,
+      title: 'To\'lov holati', key: 'debt',
+      render: (_, r) => {
+        const pct = r.totalDebt > 0 ? Math.min(100, Math.round((r.paidAmount / r.totalDebt) * 100)) : 0;
+        return (
+          <div style={{ minWidth: 120 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+              <span style={{ color: DEBT_COLOR[r.debtStatus] }}>{DEBT_LABEL[r.debtStatus]}</span>
+              <span>{formatMoney(r.paidAmount, 'USD')} / {formatMoney(r.totalDebt, 'USD')}</span>
+            </div>
+            <Progress percent={pct} showInfo={false} strokeColor={DEBT_COLOR[r.debtStatus]} size="small" />
+          </div>
+        );
+      },
     },
     {
       title: 'Foyda', key: 'profit',
-      render: (_, r) => <Text strong style={{ color: r.profit >= 0 ? '#389e0d' : '#ff4d4f' }}>{formatMoney(r.profit, 'USD')}</Text>,
+      render: (_, r) => r.paidAmount > 0 ? (
+        <Text strong style={{ color: r.profit >= 0 ? '#52c41a' : '#ff4d4f' }}>
+          {r.profit >= 0 ? '+' : ''}{formatMoney(r.profit, 'USD')}
+        </Text>
+      ) : '—',
     },
     {
       title: '', key: 'actions', width: 120,
       render: (_, r) => (
         <Space>
-          {r.status !== 'yetkazildi' && (
+          {r.debtStatus !== 'toliq' && (
+            <Button size="small" type="text" style={{ color: '#1677ff' }} icon={<DollarOutlined />} onClick={() => openPay(r)} />
+          )}
+          {r.status === "yo'lda" && (
             <Popconfirm title="Yetkazildi deb belgilaymi?" onConfirm={() => deliverMut.mutate(r._id)}>
               <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
             </Popconfirm>
@@ -146,84 +199,102 @@ export default function Deliveries() {
     },
   ];
 
-  const renderCard = (d) => (
-    <Col xs={24} sm={12} lg={8} xl={6} key={d._id}>
-      <Card className={`delivery-card ${d.status === 'yetkazildi' ? 'yetkazildi' : 'yolda'}`}>
-        <div style={{ padding: '14px 16px 10px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <Text strong style={{ fontSize: 16, fontFamily: 'monospace' }}>{d.wagonCode}</Text>
-            <Tag color={d.status === 'yetkazildi' ? 'green' : 'orange'}>
-              {d.status === 'yetkazildi' ? 'Yetkazildi' : "Yo'lda"}
-            </Tag>
+  const renderCard = (d) => {
+    const pct = d.totalDebt > 0 ? Math.min(100, Math.round((d.paidAmount / d.totalDebt) * 100)) : 0;
+    return (
+      <Col xs={24} sm={12} lg={8} xl={6} key={d._id}>
+        <Card size="small" style={{ borderLeft: `4px solid ${STATUS_COLOR[d.status] === 'green' ? '#52c41a' : STATUS_COLOR[d.status] === 'blue' ? '#1677ff' : '#fa8c16'}`, borderRadius: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+            <Text strong style={{ fontFamily: 'monospace' }}>{d.wagonCode || '—'}</Text>
+            <Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag>
           </div>
-          <div style={{ color: '#666', fontSize: 13, marginTop: 4 }}>
-            {d.origin || '—'} → {d.destination || '—'}
+          <div style={{ color: '#555', fontSize: 13, marginBottom: 2 }}>{d.customer?.name || '—'}</div>
+          {d.cargoType && <div style={{ color: '#888', fontSize: 12 }}>{d.cargoType}{d.cargoWeight ? ` — ${d.cargoWeight} t` : ''}</div>}
+          <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>
+            {formatDate(d.sentDate)}{d.arrivedDate && ` → ${formatDate(d.arrivedDate)}`}
           </div>
-          {d.customer && <div style={{ color: '#999', fontSize: 12, marginTop: 2 }}>{d.customer}</div>}
-          <div style={{ color: '#999', fontSize: 12, marginTop: 4 }}>
-            {formatDate(d.sentDate)}
-            {d.deliveredDate && ` → ${formatDate(d.deliveredDate)}`}
+
+          <div style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
+            <Descriptions size="small" column={2} labelStyle={{ color: '#888', fontSize: 11 }} contentStyle={{ fontSize: 11, fontWeight: 600 }}>
+              {d.uzRate > 0 && <Descriptions.Item label="UZ">${d.uzRate}/t</Descriptions.Item>}
+              {d.kzRate > 0 && <Descriptions.Item label="KZ">${d.kzRate}/t</Descriptions.Item>}
+              {d.avgExpense > 0 && <Descriptions.Item label="AVG">{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+              {d.kodExpense > 0 && <Descriptions.Item label="Kod">{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
+              {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
+            </Descriptions>
+            <div style={{ marginTop: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
+                <span style={{ color: DEBT_COLOR[d.debtStatus] }}>{DEBT_LABEL[d.debtStatus]}</span>
+                <span>{formatMoney(d.paidAmount, 'USD')} / <strong>{formatMoney(d.totalDebt, 'USD')}</strong></span>
+              </div>
+              <Progress percent={pct} showInfo={false} strokeColor={DEBT_COLOR[d.debtStatus]} size="small" />
+            </div>
+            {d.profit !== 0 && d.paidAmount > 0 && (
+              <div style={{ fontSize: 12, marginTop: 4, color: d.profit >= 0 ? '#52c41a' : '#ff4d4f' }}>
+                Foyda: {d.profit >= 0 ? '+' : ''}{formatMoney(d.profit, 'USD')}
+              </div>
+            )}
           </div>
-        </div>
-        <div style={{ padding: '10px 16px', background: 'linear-gradient(135deg, #f8f9fe 0%, #f0f5ff 100%)', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase' }}>Xarajat</div>
-            <div style={{ fontWeight: 700 }}>{formatMoney(d.totalExpensesUSD, 'USD')}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase' }}>Daromad</div>
-            <div style={{ fontWeight: 700, color: '#389e0d' }}>{formatMoney(d.incomeUSD, 'USD')}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: '#999', textTransform: 'uppercase' }}>Foyda</div>
-            <div style={{ fontWeight: 700, color: d.profit >= 0 ? '#389e0d' : '#ff4d4f' }}>{formatMoney(d.profit, 'USD')}</div>
-          </div>
-        </div>
-        <div style={{ padding: '8px 16px 12px', display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-          {d.status !== 'yetkazildi' && (
-            <Popconfirm title="Yetkazildi deb belgilaymi?" onConfirm={() => deliverMut.mutate(d._id)}>
-              <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
+
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
+            {d.debtStatus !== 'toliq' && (
+              <Button size="small" type="primary" icon={<DollarOutlined />} onClick={() => openPay(d)}>To'lov</Button>
+            )}
+            {d.status === "yo'lda" && (
+              <Popconfirm title="Yetkazildi?" onConfirm={() => deliverMut.mutate(d._id)}>
+                <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
+              </Popconfirm>
+            )}
+            <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(d)} />
+            <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteMut.mutate(d._id)}>
+              <Button size="small" type="text" danger icon={<DeleteOutlined />} />
             </Popconfirm>
-          )}
-          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(d)} />
-          <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteMut.mutate(d._id)}>
-            <Button size="small" type="text" danger icon={<DeleteOutlined />} />
-          </Popconfirm>
-        </div>
-      </Card>
-    </Col>
-  );
+          </div>
+        </Card>
+      </Col>
+    );
+  };
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Space wrap>
-          <Segmented options={[{ label: 'Kartalar', value: 'card' }, { label: 'Jadval', value: 'table' }]} value={viewMode} onChange={setViewMode} />
-          <Segmented options={statusOptions} value={statusFilter} onChange={setStatusFilter} />
+          <Segmented options={[{ label: 'Jadval', value: 'table' }, { label: 'Kartalar', value: 'card' }]} value={viewMode} onChange={setViewMode} />
+          <Segmented
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { label: 'Barchasi', value: '' },
+              { label: "Yo'lda", value: "yo'lda" },
+              { label: 'Yetkazildi', value: 'yetkazildi' },
+              { label: 'Yakunlandi', value: 'yakunlandi' },
+            ]}
+          />
         </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Yangi yetkazma</Button>
       </div>
 
-      {/* Summary */}
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami xarajat</span>
-            <span className="summary-stat-value">{formatMoney(totalExpenses, 'USD')}</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">Jami daromad</span>
-            <span className="summary-stat-value" style={{ color: '#389e0d' }}>{formatMoney(totalIncome, 'USD')}</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">Jami foyda</span>
-            <span className={`summary-stat-value ${totalProfit >= 0 ? 'highlight' : ''}`} style={totalProfit < 0 ? { color: '#ff4d4f' } : {}}>
-              {formatMoney(totalProfit, 'USD')}
-            </span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">Soni</span>
+            <span className="summary-stat-label">Jami yetkazma</span>
             <span className="summary-stat-value">{deliveries.length}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami qarz</span>
+            <span className="summary-stat-value">{formatMoney(totalDebt, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">To'langan</span>
+            <span className="summary-stat-value" style={{ color: '#52c41a' }}>{formatMoney(totalPaid, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Qoldiq</span>
+            <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalRemaining, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Yakunlandi</span>
+            <span className="summary-stat-value highlight">{deliveries.filter(d => d.status === 'yakunlandi').length}</span>
           </div>
         </div>
       </Card>
@@ -231,9 +302,7 @@ export default function Deliveries() {
       {viewMode === 'table' ? (
         <Table columns={columns} dataSource={deliveries} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }} />
       ) : (
-        <Row gutter={[16, 16]}>
-          {deliveries.map(renderCard)}
-        </Row>
+        <Row gutter={[16, 16]}>{deliveries.map(renderCard)}</Row>
       )}
 
       {/* Create/Edit Modal */}
@@ -245,91 +314,155 @@ export default function Deliveries() {
         confirmLoading={createMut.isPending || updateMut.isPending}
         okText="Saqlash"
         cancelText="Bekor qilish"
-        width={640}
+        width={580}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="wagonCode" label="Vagon kodi" rules={[{ required: true, message: 'Vagon kodini kiriting' }]}>
-                <Input placeholder="V-001" />
+              <Form.Item name="wagon" label="Vagon">
+                <Select
+                  showSearch allowClear placeholder="Vagon tanlang"
+                  options={wagonOptions}
+                  filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+                  onChange={(val, opt) => form.setFieldValue('wagonCode', opt?.code || '')}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="customer" label="Mijoz">
-                <Input placeholder="Mijoz nomi" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="origin" label="Qayerdan">
-                <Input placeholder="Rossiya" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="destination" label="Qayerga">
-                <Input placeholder="Toshkent" />
+              <Form.Item name="customer" label="Mijoz" rules={[{ required: true, message: 'Mijozni tanlang' }]}>
+                <Select showSearch placeholder="Mijoz tanlang" options={customerOptions}
+                  filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())} />
               </Form.Item>
             </Col>
           </Row>
+
           <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="sentDate" label="Jo'natilgan sana">
+            <Col span={8}>
+              <Form.Item name="sentDate" label="Jo'natilgan">
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
+              <Form.Item name="arrivedDate" label="Borgan">
+                <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
               <Form.Item name="status" label="Status">
-                <Select options={[{ label: "Yo'lda", value: "yo'lda" }, { label: 'Yetkazildi', value: 'yetkazildi' }]} />
+                <Select options={[
+                  { label: "Yo'lda", value: "yo'lda" },
+                  { label: 'Yetkazildi', value: 'yetkazildi' },
+                  { label: 'Yakunlandi', value: 'yakunlandi' },
+                ]} />
               </Form.Item>
             </Col>
           </Row>
-
-          <Text strong>Xarajatlar</Text>
-          <Form.List name="expenses">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map(({ key, name, ...rest }) => (
-                  <Row gutter={8} key={key} align="middle">
-                    <Col span={9}>
-                      <Form.Item {...rest} name={[name, 'description']} rules={[{ required: true, message: 'Tavsif' }]} style={{ marginBottom: 8 }}>
-                        <Input placeholder="Tavsif" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={7}>
-                      <Form.Item {...rest} name={[name, 'amount']} rules={[{ required: true, message: 'Summa' }]} style={{ marginBottom: 8 }}>
-                        <InputNumber style={{ width: '100%' }} min={0} placeholder="Summa" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={5}>
-                      <Form.Item {...rest} name={[name, 'currency']} initialValue="USD" style={{ marginBottom: 8 }}>
-                        <Select options={[{ label: 'USD', value: 'USD' }, { label: 'RUB', value: 'RUB' }]} />
-                      </Form.Item>
-                    </Col>
-                    <Col span={3}>
-                      <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} style={{ marginBottom: 8 }} />
-                    </Col>
-                  </Row>
-                ))}
-                <Button type="dashed" onClick={() => add()} block icon={<PlusOutlined />} style={{ marginBottom: 12 }}>
-                  Xarajat qo'shish
-                </Button>
-              </>
-            )}
-          </Form.List>
 
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="income" label="Daromad">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+              <Form.Item name="cargoType" label="Ichida nima">
+                <Input placeholder="Yog'och, metall..." />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="incomeCurrency" label="Daromad valyutasi">
-                <Select options={[{ label: 'USD', value: 'USD' }, { label: 'RUB', value: 'RUB' }]} />
+              <Form.Item name="cargoWeight" label="Hajmi (tonna)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
               </Form.Item>
             </Col>
           </Row>
+
+          <Title level={5} style={{ margin: '8px 0 12px' }}>Chegara to'lovlari (mijoz qarzi)</Title>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="uzRate" label="UZ (USD/tonna)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="kzRate" label="KZ (USD/tonna)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={8}>
+              <Form.Item name="avgExpense" label="AVG (USD)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="kodExpense" label="Kod (USD)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="prastoy" label="Prastoy (USD)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {/* Live total */}
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const w = form.getFieldValue('cargoWeight') || 0;
+              const uz = (form.getFieldValue('uzRate') || 0) * w;
+              const kz = (form.getFieldValue('kzRate') || 0) * w;
+              const avg = form.getFieldValue('avgExpense') || 0;
+              const kod = form.getFieldValue('kodExpense') || 0;
+              const pr = form.getFieldValue('prastoy') || 0;
+              const total = uz + kz + avg + kod + pr;
+              if (!total) return null;
+              return (
+                <Card size="small" style={{ background: '#fff7e6' }}>
+                  <Row gutter={8}>
+                    {uz > 0 && <Col span={12}><Text type="secondary">UZ: </Text><Text strong>{formatMoney(uz, 'USD')}</Text></Col>}
+                    {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
+                    {avg > 0 && <Col span={12}><Text type="secondary">AVG: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
+                    {kod > 0 && <Col span={12}><Text type="secondary">Kod: </Text><Text strong>{formatMoney(kod, 'USD')}</Text></Col>}
+                    {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
+                  </Row>
+                  <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
+                    Mijoz qarzi: <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
+                  </div>
+                </Card>
+              );
+            }}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Payment Modal */}
+      <Modal
+        title={`To'lov — ${payTarget?.wagonCode || ''} (${payTarget?.customer?.name || ''})`}
+        open={payModalOpen}
+        onCancel={() => { setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); }}
+        onOk={() => payForm.submit()}
+        confirmLoading={payMut.isPending}
+        okText="To'lov qo'shish"
+        cancelText="Bekor qilish"
+      >
+        {payTarget && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f6ffed', borderRadius: 8 }}>
+            <Row gutter={16}>
+              <Col span={8}><Text type="secondary">Jami qarz:</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
+              <Col span={8}><Text type="secondary">To'langan:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
+              <Col span={8}><Text type="secondary">Qoldiq:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
+            </Row>
+          </div>
+        )}
+        <Form form={payForm} layout="vertical" onFinish={(values) => {
+          payMut.mutate({ id: payTarget._id, data: { ...values, date: values.date?.toISOString() } });
+        }}>
+          <Form.Item name="amount" label="To'lov summasi (USD)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" addonBefore="$" />
+          </Form.Item>
+          <Form.Item name="date" label="Sana">
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="note" label="Izoh">
+            <Input placeholder="Izoh" />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

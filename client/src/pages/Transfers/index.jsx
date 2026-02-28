@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Table, Button, Modal, Form, InputNumber, DatePicker, Input, message, Card, Typography, Divider, Space, Popconfirm } from 'antd';
-import { PlusOutlined, DollarOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, InputNumber, DatePicker, Input, message, Card, Typography, Space, Popconfirm } from 'antd';
+import { PlusOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  getExchangeRate, setExchangeRate,
   convertCurrency, getConversions, deleteConversion,
   createTopUp, getTopUps, deleteTopUp,
 } from '../../api';
@@ -18,7 +17,6 @@ export default function Transfers() {
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [convertForm] = Form.useForm();
   const [topUpForm] = Form.useForm();
-  const [rateInput, setRateInput] = useState(null);
 
   const { data: conversions = [], isLoading } = useQuery({
     queryKey: ['conversions'],
@@ -30,21 +28,12 @@ export default function Transfers() {
     queryFn: getTopUps,
   });
 
-  const { data: rateData } = useQuery({
-    queryKey: ['exchangeRate'],
-    queryFn: getExchangeRate,
-  });
-
-  const currentRate = rateData?.rate || 0;
-
-  const rateMutation = useMutation({
-    mutationFn: (rate) => setExchangeRate(rate),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['exchangeRate'] });
-      message.success('Valyuta kursi saqlandi');
-    },
-    onError: () => message.error('Xatolik'),
-  });
+  // Average rate from this month's conversions
+  const thisMonth = dayjs().format('YYYY-MM');
+  const monthConversions = conversions.filter(c => dayjs(c.date).format('YYYY-MM') === thisMonth);
+  const currentRate = monthConversions.length
+    ? monthConversions.reduce((s, c) => s + c.amountRUB, 0) / monthConversions.reduce((s, c) => s + c.amountUSD, 0)
+    : 0;
 
   const convertMutation = useMutation({
     mutationFn: convertCurrency,
@@ -95,9 +84,10 @@ export default function Transfers() {
   });
 
   const handleConvert = (values) => {
+    const rubAmount = values.amountUSD * values.rate * (1 - (values.commissionPercent || 0) / 100);
     convertMutation.mutate({
       amountUSD: values.amountUSD,
-      amountRUB: values.amountRUB,
+      amountRUB: rubAmount,
       commissionPercent: values.commissionPercent || 0,
       date: values.date?.toISOString(),
       note: values.note,
@@ -148,26 +138,16 @@ export default function Transfers() {
 
   return (
     <div>
-      {/* Exchange rate card */}
-      <Card size="small" style={{ marginBottom: 16 }}>
-        <Space align="center" size="middle">
-          <DollarOutlined style={{ fontSize: 20, color: '#1677ff' }} />
-          <Text strong>Valyuta kursi:</Text>
-          <Text>1 USD = <Text strong style={{ fontSize: 16, color: '#1677ff' }}>{currentRate || '—'}</Text> RUB</Text>
-          <Divider type="vertical" />
-          <InputNumber
-            size="small" min={0} step={0.01}
-            placeholder="Yangi kurs" value={rateInput}
-            onChange={setRateInput} style={{ width: 130 }}
-          />
-          <Button size="small" type="primary"
-            loading={rateMutation.isPending}
-            disabled={!rateInput || rateInput === currentRate}
-            onClick={() => { rateMutation.mutate(rateInput); setRateInput(null); }}>
-            Saqlash
-          </Button>
-        </Space>
-      </Card>
+      {/* Monthly avg rate display */}
+      {currentRate > 0 && (
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Space>
+            <Text strong>Shu oylik o'rtacha kurs:</Text>
+            <Text strong style={{ fontSize: 16, color: '#1677ff' }}>1 USD = {currentRate.toFixed(2)} RUB</Text>
+            <Text type="secondary">({monthConversions.length} ta konversiya asosida)</Text>
+          </Space>
+        </Card>
+      )}
 
       {/* Top-ups section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -215,11 +195,11 @@ export default function Transfers() {
         cancelText="Bekor qilish"
       >
         <Form form={convertForm} layout="vertical" onFinish={handleConvert} initialValues={{ commissionPercent: 0, date: dayjs() }}>
-          <Form.Item name="amountUSD" label="Bergan summa (USD)" rules={[{ required: true, message: 'USD summani kiriting' }]}>
+          <Form.Item name="amountUSD" label="Berilgan summa (USD)" rules={[{ required: true, message: 'USD summani kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="1000" />
           </Form.Item>
-          <Form.Item name="amountRUB" label="Olgan summa (RUB)" rules={[{ required: true, message: 'RUB summani kiriting' }]}>
-            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="80000" />
+          <Form.Item name="rate" label="Kurs (1 USD = ? RUB)" rules={[{ required: true, message: 'Kursni kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder={currentRate || '9000'} />
           </Form.Item>
           <Form.Item name="commissionPercent" label="Komissiya (%)">
             <InputNumber style={{ width: '100%' }} min={0} max={100} placeholder="0" />
@@ -234,15 +214,16 @@ export default function Transfers() {
           <Form.Item noStyle shouldUpdate>
             {() => {
               const usd = convertForm.getFieldValue('amountUSD') || 0;
-              const rub = convertForm.getFieldValue('amountRUB') || 0;
-              if (!usd || !rub) return null;
-              const rate = rub / usd;
+              const rate = convertForm.getFieldValue('rate') || 0;
+              const comm = convertForm.getFieldValue('commissionPercent') || 0;
+              if (!usd || !rate) return null;
+              const rub = usd * rate * (1 - comm / 100);
               return (
                 <Card size="small" style={{ background: '#f6ffed' }}>
-                  <div>Kurs: <Text strong style={{ color: '#1677ff', fontSize: 16 }}>1 USD = {rate.toFixed(2)} RUB</Text></div>
+                  <div>Olinadigan summa: <Text strong style={{ color: '#389e0d', fontSize: 16 }}>+{formatMoney(rub, 'RUB')}</Text></div>
                   <div style={{ marginTop: 4 }}>
-                    <Text type="secondary">USD hisobdan: </Text><Text type="danger" strong>−{formatMoney(usd, 'USD')}</Text>
-                    <Text type="secondary" style={{ marginLeft: 12 }}>RUB hisobga: </Text><Text style={{ color: '#389e0d' }} strong>+{formatMoney(rub, 'RUB')}</Text>
+                    <Text type="secondary">Effektiv kurs: </Text>
+                    <Text strong>1 USD = {(rub / usd).toFixed(2)} RUB</Text>
                   </div>
                 </Card>
               );

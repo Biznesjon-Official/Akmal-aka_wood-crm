@@ -124,6 +124,7 @@ exports.remove = async (req, res, next) => {
     const Payment = require('../models/Payment');
     await Payment.deleteMany({ sale: sale._id }).session(session);
     await CashTransaction.deleteMany({ relatedSale: sale._id }).session(session);
+
     await sale.deleteOne({ session });
 
     await session.commitTransaction();
