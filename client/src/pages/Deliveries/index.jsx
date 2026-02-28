@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select,
+  Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, AutoComplete,
   message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress,
 } from 'antd';
 import {
@@ -10,7 +10,7 @@ import {
 import dayjs from 'dayjs';
 import {
   getDeliveries, createDelivery, updateDelivery, deleteDelivery,
-  markDelivered, addDeliveryPayment, getWagons, getCustomers,
+  markDelivered, addDeliveryPayment, getCustomers, createCustomer,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
@@ -32,6 +32,8 @@ export default function Deliveries() {
   const [payForm] = Form.useForm();
   const [viewMode, setViewMode] = useState('table');
   const [statusFilter, setStatusFilter] = useState('');
+  const [customerTyped, setCustomerTyped] = useState('');
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['deliveries'] });
@@ -44,11 +46,14 @@ export default function Deliveries() {
     queryFn: () => getDeliveries(statusFilter ? { status: statusFilter } : {}),
   });
 
-  const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: getWagons });
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
 
-  const wagonOptions = wagons.map(w => ({ label: w.wagonCode || w._id, value: w._id, code: w.wagonCode }));
-  const customerOptions = customers.map(c => ({ label: c.name, value: c._id }));
+  const customerOptions = customers.map(c => ({ label: c.name, value: c.name, id: c._id }));
+
+  const createCustomerMut = useMutation({
+    mutationFn: createCustomer,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
+  });
 
   const createMut = useMutation({
     mutationFn: createDelivery,
@@ -78,21 +83,27 @@ export default function Deliveries() {
     onError: () => message.error('Xatolik'),
   });
 
-  const closeModal = () => { setModalOpen(false); setEditing(null); form.resetFields(); };
+  const closeModal = () => {
+    setModalOpen(false); setEditing(null);
+    form.resetFields(); setCustomerTyped(''); setIsNewCustomer(false);
+  };
 
   const openCreate = () => {
     form.resetFields();
     form.setFieldsValue({ sentDate: dayjs() });
-    setEditing(null);
+    setEditing(null); setCustomerTyped(''); setIsNewCustomer(false);
     setModalOpen(true);
   };
 
   const openEdit = (record) => {
     setEditing(record);
+    const custName = record.customer?.name || '';
+    setCustomerTyped(custName);
+    setIsNewCustomer(false);
     form.setFieldsValue({
       ...record,
-      wagon: record.wagon?._id || record.wagon,
-      customer: record.customer?._id || record.customer,
+      wagonCode: record.wagonCode || '',
+      customerName: custName,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
       arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
     });
@@ -105,14 +116,38 @@ export default function Deliveries() {
     setPayModalOpen(true);
   };
 
-  const handleSubmit = (values) => {
-    const data = {
-      ...values,
-      sentDate: values.sentDate?.toISOString(),
-      arrivedDate: values.arrivedDate?.toISOString(),
-    };
-    if (editing) updateMut.mutate({ id: editing._id, data });
-    else createMut.mutate(data);
+  const handleSubmit = async (values) => {
+    try {
+      let customerId = editing?.customer?._id || editing?.customer;
+      const name = values.customerName?.trim();
+
+      if (name) {
+        const existing = customers.find(c => c.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          customerId = existing._id;
+        } else {
+          // Create new customer
+          const newCust = await createCustomerMut.mutateAsync({
+            name,
+            phone: values.customerPhone || '',
+          });
+          customerId = newCust._id;
+        }
+      }
+
+      const data = {
+        ...values,
+        wagonCode: values.wagonCode || '',
+        customer: customerId,
+        sentDate: values.sentDate?.toISOString(),
+        arrivedDate: values.arrivedDate?.toISOString(),
+      };
+      delete data.customerName;
+      delete data.customerPhone;
+
+      if (editing) updateMut.mutate({ id: editing._id, data });
+      else createMut.mutate(data);
+    } catch { message.error('Xatolik'); }
   };
 
   // Summary stats
@@ -319,22 +354,31 @@ export default function Deliveries() {
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="wagon" label="Vagon">
-                <Select
-                  showSearch allowClear placeholder="Vagon tanlang"
-                  options={wagonOptions}
-                  filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
-                  onChange={(val, opt) => form.setFieldValue('wagonCode', opt?.code || '')}
-                />
+              <Form.Item name="wagonCode" label="Vagon raqami">
+                <Input placeholder="V-001 (ixtiyoriy)" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="customer" label="Mijoz" rules={[{ required: true, message: 'Mijozni tanlang' }]}>
-                <Select showSearch placeholder="Mijoz tanlang" options={customerOptions}
-                  filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())} />
+              <Form.Item name="customerName" label="Mijoz" rules={[{ required: true, message: 'Mijoz nomini kiriting' }]}>
+                <AutoComplete
+                  options={customerOptions}
+                  placeholder="Mijoz ismi"
+                  filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+                  value={customerTyped}
+                  onChange={(val) => {
+                    setCustomerTyped(val);
+                    const found = customers.find(c => c.name.toLowerCase() === val.toLowerCase());
+                    setIsNewCustomer(!!val && !found);
+                  }}
+                />
               </Form.Item>
             </Col>
           </Row>
+          {isNewCustomer && (
+            <Form.Item name="customerPhone" label="Telefon (yangi mijoz uchun, ixtiyoriy)">
+              <Input placeholder="+998 90 000 00 00" />
+            </Form.Item>
+          )}
 
           <Row gutter={12}>
             <Col span={8}>

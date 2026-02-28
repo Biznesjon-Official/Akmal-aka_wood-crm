@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse } from '../../api';
+import DeliveriesTab from '../Deliveries';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
 import '../styles/cards.css';
@@ -906,6 +907,11 @@ export default function Wagons() {
           key: 'archive',
           label: `Arxiv (${archivedWagons.length})`,
           children: renderList(archivedWagons, archiveColumns, true),
+        },
+        {
+          key: 'deliveries',
+          label: 'Yetkazmalar',
+          children: <DeliveriesTab />,
         },
       ]} />
 
