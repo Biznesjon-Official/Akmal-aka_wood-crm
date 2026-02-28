@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, InputNumber, Select, DatePicker,
-  Input, message, Tag, Card, Row, Col, Statistic, Space, Popconfirm, List, Switch, Segmented, Typography, Divider,
+  Input, message, Tag, Card, Row, Col, Space, Popconfirm, List, Switch, Segmented, Typography, Divider,
 } from 'antd';
 import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, TeamOutlined, DollarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -257,22 +257,50 @@ export default function Cash() {
     { title: 'Izoh', dataIndex: 'description', key: 'description', ellipsis: true },
   ];
 
+  // Compute summary stats from all transactions (unfiltered would be ideal, but use filtered as proxy)
+  const totalKirimUSD = transactions.filter(t => t.type === 'kirim' && t.currency === 'USD').reduce((s, t) => s + t.amount, 0);
+  const totalChiqimUSD = transactions.filter(t => t.type === 'chiqim' && t.currency === 'USD').reduce((s, t) => s + t.amount, 0);
+  const totalKirimRUB = transactions.filter(t => t.type === 'kirim' && t.currency === 'RUB').reduce((s, t) => s + t.amount, 0);
+  const totalChiqimRUB = transactions.filter(t => t.type === 'chiqim' && t.currency === 'RUB').reduce((s, t) => s + t.amount, 0);
+
   return (
     <div>
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12}>
-          <Card>
-            <Statistic title="USD hisob balansi" value={balance?.USD}
-              prefix={<WalletOutlined />} formatter={(val) => formatMoney(val, 'USD')} />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12}>
-          <Card>
-            <Statistic title="RUB hisob balansi" value={balance?.RUB}
-              prefix={<WalletOutlined />} formatter={(val) => formatMoney(val, 'RUB')} />
-          </Card>
-        </Col>
-      </Row>
+      <Card className="summary-card" style={{ marginBottom: 16 }}>
+        <div className="summary-stats">
+          <div className="summary-stat">
+            <span className="summary-stat-label">Balans (USD)</span>
+            <span className="summary-stat-value highlight">{formatMoney(balance?.USD, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Balans (RUB)</span>
+            <span className="summary-stat-value">{formatMoney(balance?.RUB, 'RUB')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Kirim (USD)</span>
+            <span className="summary-stat-value" style={{ color: '#52c41a' }}>+{formatMoney(totalKirimUSD, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Chiqim (USD)</span>
+            <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>−{formatMoney(totalChiqimUSD, 'USD')}</span>
+          </div>
+          {totalKirimRUB > 0 && (
+            <div className="summary-stat">
+              <span className="summary-stat-label">Kirim (RUB)</span>
+              <span className="summary-stat-value" style={{ color: '#52c41a' }}>+{formatMoney(totalKirimRUB, 'RUB')}</span>
+            </div>
+          )}
+          {totalChiqimRUB > 0 && (
+            <div className="summary-stat">
+              <span className="summary-stat-label">Chiqim (RUB)</span>
+              <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>−{formatMoney(totalChiqimRUB, 'RUB')}</span>
+            </div>
+          )}
+          <div className="summary-stat">
+            <span className="summary-stat-label">Jami tranzaksiya</span>
+            <span className="summary-stat-value">{transactions.length}</span>
+          </div>
+        </div>
+      </Card>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space wrap>
