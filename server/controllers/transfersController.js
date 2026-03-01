@@ -1,6 +1,7 @@
 const Transfer = require('../models/Transfer');
 const CashTransaction = require('../models/CashTransaction');
 const CurrencyConversion = require('../models/CurrencyConversion');
+const Settings = require('../models/Settings');
 const TopUp = require('../models/TopUp');
 
 exports.getAll = async (req, res, next) => {
@@ -86,6 +87,9 @@ exports.convertCurrency = async (req, res, next) => {
       relatedConversion: conversion._id,
       date: date || new Date(),
     });
+
+    // Auto-update exchange rate in Settings
+    await Settings.setExchangeRate(effectiveRate);
 
     res.status(201).json(conversion);
   } catch (err) { next(err); }
