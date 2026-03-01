@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Drawer, List, Tag, Row, Col, Card, Segmented, Typography } from 'antd';
+import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Drawer, Tag, Row, Col, Card, Segmented, Typography, Descriptions } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getCustomerDebts } from '../../api';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
 
@@ -17,7 +17,6 @@ const Customers = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
 
-  // Queries
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: getCustomers,
@@ -29,13 +28,29 @@ const Customers = () => {
     enabled: !!selectedCustomer?._id,
   });
 
-  const { data: customerDebts, isLoading: debtsLoading } = useQuery({
-    queryKey: ['customer-debts', selectedCustomer?._id],
-    queryFn: () => getCustomerDebts(selectedCustomer._id),
+  const { data: customerPayments } = useQuery({
+    queryKey: ['customer-payments', selectedCustomer?._id],
+    queryFn: () => getPayments({ customer: selectedCustomer._id }),
     enabled: !!selectedCustomer?._id,
   });
 
-  // Mutations
+  // Group payments by sale._id
+  const paymentsBySale = {};
+  (customerPayments || []).forEach((p) => {
+    const saleId = p.sale?._id || p.sale;
+    if (!saleId) return;
+    if (!paymentsBySale[saleId]) paymentsBySale[saleId] = [];
+    paymentsBySale[saleId].push(p);
+  });
+
+  // Summary stats
+  const totalSaleAmount = (customerSales || []).reduce((s, sale) => s + (sale.totalAmount || 0), 0);
+  const totalPaid = (customerSales || []).reduce((s, sale) => {
+    const extraPaid = (paymentsBySale[sale._id] || []).reduce((ps, p) => ps + (p.amount || 0), 0);
+    return s + (sale.paidAmount || 0) + extraPaid;
+  }, 0);
+  const totalDebt = totalSaleAmount - totalPaid;
+
   const createMutation = useMutation({
     mutationFn: createCustomer,
     onSuccess: () => {
@@ -65,7 +80,6 @@ const Customers = () => {
     onError: () => message.error('Xatolik yuz berdi'),
   });
 
-  // Handlers
   const openCreate = () => {
     setEditingCustomer(null);
     form.resetFields();
@@ -103,30 +117,11 @@ const Customers = () => {
     setSelectedCustomer(null);
   };
 
-  // Table columns
   const columns = [
-    {
-      title: 'Ism',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Telefon',
-      dataIndex: 'phone',
-      key: 'phone',
-    },
-    {
-      title: 'Izoh',
-      dataIndex: 'note',
-      key: 'note',
-      ellipsis: true,
-    },
-    {
-      title: 'Sana',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (val) => formatDate(val),
-    },
+    { title: 'Ism', dataIndex: 'name', key: 'name' },
+    { title: 'Telefon', dataIndex: 'phone', key: 'phone' },
+    { title: 'Izoh', dataIndex: 'note', key: 'note', ellipsis: true },
+    { title: 'Sana', dataIndex: 'createdAt', key: 'createdAt', render: (val) => formatDate(val) },
     {
       title: 'Amallar',
       key: 'actions',
@@ -137,8 +132,7 @@ const Customers = () => {
           <Popconfirm
             title="Mijozni o'chirishni tasdiqlaysizmi?"
             onConfirm={() => deleteMutation.mutate(record._id)}
-            okText="Ha"
-            cancelText="Yo'q"
+            okText="Ha" cancelText="Yo'q"
           >
             <Button danger icon={<DeleteOutlined />} />
           </Popconfirm>
@@ -147,25 +141,52 @@ const Customers = () => {
     },
   ];
 
-  // Sales mini-table columns
+  // Expandable: payment list per sale
+  const expandedRowRender = (sale) => {
+    const payments = paymentsBySale[sale._id] || [];
+    const rows = [];
+    if (sale.paidAmount > 0) {
+      rows.push({ _id: 'initial', date: sale.date || sale.createdAt, amount: sale.paidAmount, note: 'Dastlabki to\'lov' });
+    }
+    payments.forEach((p) => rows.push({ _id: p._id, date: p.date, amount: p.amount, note: p.note || '' }));
+    if (rows.length === 0) return <Text type="secondary" style={{ paddingLeft: 24 }}>To'lov yo'q</Text>;
+    return (
+      <Table
+        rowKey="_id"
+        dataSource={rows}
+        size="small"
+        pagination={false}
+        style={{ margin: '0 24px' }}
+        columns={[
+          { title: 'Sana', dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
+          { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v) => formatMoney(v) },
+          { title: 'Izoh', dataIndex: 'note', key: 'note' },
+        ]}
+      />
+    );
+  };
+
   const salesColumns = [
-    {
-      title: 'Sana',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      render: (val) => formatDate(val),
-    },
-    {
-      title: 'Umumiy summa',
-      dataIndex: 'totalAmount',
-      key: 'totalAmount',
-      render: (val) => formatMoney(val),
-    },
+    { title: 'Sana', dataIndex: 'date', key: 'date', width: 100, render: (v, r) => formatDate(v || r.createdAt) },
+    { title: 'Jami summa', dataIndex: 'totalAmount', key: 'totalAmount', render: (v) => formatMoney(v) },
     {
       title: 'To\'langan',
-      dataIndex: 'paidAmount',
-      key: 'paidAmount',
-      render: (val) => formatMoney(val),
+      key: 'paid',
+      render: (_, sale) => {
+        const extra = (paymentsBySale[sale._id] || []).reduce((s, p) => s + (p.amount || 0), 0);
+        return formatMoney((sale.paidAmount || 0) + extra);
+      },
+    },
+    {
+      title: 'Qarz',
+      key: 'debt',
+      render: (_, sale) => {
+        const extra = (paymentsBySale[sale._id] || []).reduce((s, p) => s + (p.amount || 0), 0);
+        const debt = (sale.totalAmount || 0) - (sale.paidAmount || 0) - extra;
+        return debt > 0
+          ? <Text type="danger">{formatMoney(debt)}</Text>
+          : <Tag color="green">To'liq</Tag>;
+      },
     },
   ];
 
@@ -229,12 +250,7 @@ const Customers = () => {
       </Card>
 
       {viewMode === 'card' ? renderCustomerCards() : (
-        <Table
-          rowKey="_id"
-          columns={columns}
-          dataSource={customers}
-          loading={isLoading}
-        />
+        <Table rowKey="_id" columns={columns} dataSource={customers} loading={isLoading} />
       )}
 
       {/* Create / Edit Modal */}
@@ -244,23 +260,14 @@ const Customers = () => {
         onOk={handleSubmit}
         onCancel={closeModal}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText="Saqlash" cancelText="Bekor qilish"
       >
         <Form form={form} layout="vertical">
-          <Form.Item
-            name="name"
-            label="Ism"
-            rules={[{ required: true, message: 'Ismni kiriting' }]}
-          >
+          <Form.Item name="name" label="Ism" rules={[{ required: true, message: 'Ismni kiriting' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="phone" label="Telefon">
-            <Input />
-          </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input.TextArea rows={3} />
-          </Form.Item>
+          <Form.Item name="phone" label="Telefon"><Input /></Form.Item>
+          <Form.Item name="note" label="Izoh"><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Modal>
 
@@ -270,14 +277,48 @@ const Customers = () => {
         open={drawerOpen}
         onClose={closeDrawer}
         size="large"
+        width={720}
       >
         {selectedCustomer && (
           <>
-            <p><strong>Telefon:</strong> {selectedCustomer.phone || '—'}</p>
-            <p><strong>Izoh:</strong> {selectedCustomer.note || '—'}</p>
-            <p><strong>Ro'yxatdan o'tgan:</strong> {formatDate(selectedCustomer.createdAt)}</p>
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 20 }}>
+              <Descriptions.Item label="Telefon">{selectedCustomer.phone || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Qo'shilgan">{formatDate(selectedCustomer.createdAt)}</Descriptions.Item>
+              {selectedCustomer.note && (
+                <Descriptions.Item label="Izoh" span={2}>{selectedCustomer.note}</Descriptions.Item>
+              )}
+            </Descriptions>
 
-            <h3 style={{ marginTop: 24 }}>Sotuvlar</h3>
+            {/* Transaction summary */}
+            <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
+              <Row gutter={16}>
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Jami sotuv</Text>
+                  <div><Text strong>{formatMoney(totalSaleAmount)}</Text></div>
+                </Col>
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>To'langan</Text>
+                  <div><Text strong style={{ color: '#52c41a' }}>{formatMoney(totalPaid)}</Text></div>
+                </Col>
+                <Col span={8}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>Qolgan qarz</Text>
+                  <div>
+                    <Text strong style={{ color: totalDebt > 0 ? '#ff4d4f' : '#52c41a' }}>
+                      {totalDebt > 0 ? formatMoney(totalDebt) : 'Qarz yo\'q'}
+                    </Text>
+                  </div>
+                </Col>
+              </Row>
+            </Card>
+
+            <h3 style={{ marginBottom: 8 }}>
+              Savdo tarixi
+              {customerSales && (
+                <Text type="secondary" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>
+                  ({customerSales.length} ta sotuv)
+                </Text>
+              )}
+            </h3>
             <Table
               rowKey="_id"
               columns={salesColumns}
@@ -285,19 +326,8 @@ const Customers = () => {
               loading={salesLoading}
               size="small"
               pagination={false}
-            />
-
-            <h3 style={{ marginTop: 24 }}>Qarzlar</h3>
-            <List
-              loading={debtsLoading}
-              dataSource={customerDebts}
-              locale={{ emptyText: 'Qarz yo\'q' }}
-              renderItem={(item) => (
-                <List.Item>
-                  <span>{formatDate(item.createdAt)}</span>
-                  <Tag color="red">{formatMoney(item.debtAmount)}</Tag>
-                </List.Item>
-              )}
+              expandable={{ expandedRowRender }}
+              locale={{ emptyText: 'Sotuv yo\'q' }}
             />
           </>
         )}
