@@ -45,6 +45,7 @@ const wagonSchema = new mongoose.Schema({
   arrivedDate: Date,
   origin: String,
   destination: String,
+  supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
   expenses: [expenseSchema],
   exchangeRate: { type: Number, default: 0 },
   costPricePerM3: { type: Number, default: 0 },

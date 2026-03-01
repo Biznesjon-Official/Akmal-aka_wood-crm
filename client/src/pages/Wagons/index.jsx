@@ -9,7 +9,7 @@ import {
   ArrowRightOutlined, CalendarOutlined, SendOutlined, EnvironmentOutlined, ShoppingCartOutlined, CarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse } from '../../api';
+import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse, getSuppliers } from '../../api';
 import DeliveriesTab from '../Deliveries';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
@@ -128,13 +128,14 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
 }
 
 // ===================== CREATE MODAL =====================
-function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon' }) {
+function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon', suppliers = [] }) {
   const isMashina = transportType === 'mashina';
   const [wagonCode, setWagonCode] = useState('');
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [sentDate, setSentDate] = useState(null);
   const [arrivedDate, setArrivedDate] = useState(null);
+  const [supplier, setSupplier] = useState(null);
   const [errors, setErrors] = useState({});
 
   const initExp = buildExpensesState([]);
@@ -157,6 +158,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
     onSave({
       type: transportType,
       wagonCode, origin, destination,
+      supplier: supplier || null,
       sentDate: sentDate?.toISOString() || null,
       arrivedDate: arrivedDate?.toISOString() || null,
       expenses: flattenExpenses(fixed, wood, custom),
@@ -165,7 +167,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   };
 
   const handleAfterClose = () => {
-    setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null);
+    setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null); setSupplier(null);
     const fresh = buildExpensesState([]);
     setFixed(fresh.fixed); setWood(fresh.wood); setCustom(fresh.custom);
     setBundles([]); setErrors({});
@@ -218,6 +220,14 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
             <td style={cellS}>
               <Input size="small" value={destination} status={errors.destination ? 'error' : undefined}
                 onChange={(e) => { setDestination(e.target.value); setErrors((p) => ({ ...p, destination: false })); }} />
+            </td>
+          </tr>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={labelS}>Rus (yetkazib beruvchi)</td>
+            <td style={cellS}>
+              <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
+                value={supplier} onChange={setSupplier}
+                options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />
             </td>
           </tr>
         </tbody>
@@ -323,7 +333,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
 }
 
 // ===================== DETAIL MODAL =====================
-function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, deleting, globalRate, onWarehouse, warehouseLoading }) {
+function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, deleting, globalRate, onWarehouse, warehouseLoading, suppliers = [] }) {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [fixed, setFixed] = useState([]);
@@ -339,6 +349,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
     setFormData({
       wagonCode: wagon.wagonCode, origin: wagon.origin, destination: wagon.destination,
       sentDate: wagon.sentDate, arrivedDate: wagon.arrivedDate, exchangeRate: wagon.exchangeRate || 0,
+      supplier: wagon.supplier?._id || wagon.supplier || null,
     });
     const exp = buildExpensesState(wagon.expenses);
     setFixed(exp.fixed); setWood(exp.wood); setCustom(exp.custom);
@@ -415,6 +426,9 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             <Descriptions.Item label="Qayerga">{wagon.destination || '-'}</Descriptions.Item>
             <Descriptions.Item label="Kurs (RUB/USD)">{rate || '-'}</Descriptions.Item>
             <Descriptions.Item label="Jami m³">{formatM3(totalM3)}</Descriptions.Item>
+            <Descriptions.Item label="Rus (yetkazib beruvchi)" span={2}>
+              {wagon.supplier?.name || '—'}
+            </Descriptions.Item>
           </Descriptions>
 
           {/* Wood bundles view */}
@@ -507,6 +521,10 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
                 ['Qayerga', <Input size="small" value={formData.destination} onChange={(e) => setFormData((p) => ({ ...p, destination: e.target.value }))} />],
                 ['Kurs (RUB/USD)', <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.01} value={formData.exchangeRate}
                   onChange={(v) => setFormData((p) => ({ ...p, exchangeRate: v || 0 }))} placeholder="Masalan: 90" />],
+                ['Rus (yetkazib beruvchi)', <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
+                  value={formData.supplier || null}
+                  onChange={(v) => setFormData((p) => ({ ...p, supplier: v || null }))}
+                  options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />],
               ].map(([label, input]) => (
                 <tr key={label} style={{ borderBottom: '1px solid #f0f0f0' }}>
                   <td style={{ ...labelS, width: 160 }}>{label}</td>
@@ -779,6 +797,7 @@ export default function Wagons() {
 
   const { data: wagons = [], isLoading } = useQuery({ queryKey: ['wagons', filters], queryFn: () => getWagons(filters) });
   const { data: rateData } = useQuery({ queryKey: ['exchangeRate'], queryFn: getExchangeRate });
+  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
 
   const createMutation = useMutation({
     mutationFn: createWagon,
@@ -820,6 +839,7 @@ export default function Wagons() {
     { title: 'Qayerga', dataIndex: 'destination', key: 'destination', width: 100 },
     { title: 'Jami m³', dataIndex: 'totalM3', key: 'totalM3', width: 110, render: formatM3 },
     { title: 'Tannarx/m³', dataIndex: 'costPricePerM3', key: 'costPricePerM3', width: 120, render: (v) => formatMoney(v) },
+    { title: 'Rus', key: 'supplier', width: 100, render: (_, r) => r.supplier?.name || '—' },
   ];
 
   // Archive columns — show "Sotildi" instead of actual status
@@ -917,13 +937,14 @@ export default function Wagons() {
 
       <CreateWagonModal open={createOpen} onCancel={() => setCreateOpen(false)}
         onSave={(data) => createMutation.mutate(data)} loading={createMutation.isPending}
-        globalRate={rateData?.rate || 0} transportType={createType} />
+        globalRate={rateData?.rate || 0} transportType={createType} suppliers={suppliers} />
 
       <WagonDetailModal wagon={selectedWagon} open={!!selectedWagon} onClose={() => setSelectedWagon(null)}
         onUpdate={(data) => updateMutation.mutate({ id: selectedWagon._id, data })}
         onDelete={(id) => deleteMutation.mutate(id)} updating={updateMutation.isPending}
         deleting={deleteMutation.isPending} globalRate={rateData?.rate || 0}
-        onWarehouse={(id) => warehouseMutation.mutate(id)} warehouseLoading={warehouseMutation.isPending} />
+        onWarehouse={(id) => warehouseMutation.mutate(id)} warehouseLoading={warehouseMutation.isPending}
+        suppliers={suppliers} />
 
       <BundleSellModal wagon={sellWagon} open={!!sellWagon} onClose={() => setSellWagon(null)} />
     </div>

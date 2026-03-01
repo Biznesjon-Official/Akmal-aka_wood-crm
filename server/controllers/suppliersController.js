@@ -38,3 +38,11 @@ exports.remove = async (req, res, next) => {
     res.json({ message: 'Deleted' });
   } catch (err) { next(err); }
 };
+
+exports.getWagons = async (req, res, next) => {
+  try {
+    const Wagon = require('../models/Wagon');
+    const wagons = await Wagon.find({ supplier: req.params.id }).sort({ createdAt: -1 }).lean();
+    res.json(wagons);
+  } catch (err) { next(err); }
+};

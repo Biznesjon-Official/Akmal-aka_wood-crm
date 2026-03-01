@@ -29,15 +29,16 @@ async function syncWagonCashTransactions(wagonId, expenses, transportType) {
 
 exports.getAll = async (req, res, next) => {
   try {
-    const { status, startDate, endDate } = req.query;
+    const { status, startDate, endDate, supplier } = req.query;
     const filter = {};
     if (status) filter.status = status;
+    if (supplier) filter.supplier = supplier;
     if (startDate || endDate) {
       filter.sentDate = {};
       if (startDate) filter.sentDate.$gte = new Date(startDate);
       if (endDate) filter.sentDate.$lte = new Date(endDate);
     }
-    const wagons = await Wagon.find(filter).sort({ createdAt: -1 }).lean();
+    const wagons = await Wagon.find(filter).populate('supplier', 'name phone').sort({ createdAt: -1 }).lean();
     res.json(wagons);
   } catch (err) { next(err); }
 };

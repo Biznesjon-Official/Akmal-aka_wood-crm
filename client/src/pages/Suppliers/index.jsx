@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Card, Segmented, Row, Col, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Card, Segmented, Row, Col, Typography, Drawer, Tag, Descriptions } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, EyeOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../../api';
-import { formatDate } from '../../utils/format';
+import { getSuppliers, createSupplier, updateSupplier, deleteSupplier, getSupplierWagons } from '../../api';
+import { formatDate, formatM3, statusLabels, statusColors } from '../../utils/format';
 import '../styles/cards.css';
 
 const { Text } = Typography;
@@ -14,10 +14,18 @@ const Suppliers = () => {
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState(null);
 
   const { data: suppliers, isLoading } = useQuery({
     queryKey: ['suppliers'],
     queryFn: getSuppliers,
+  });
+
+  const { data: supplierWagons, isLoading: wagonsLoading } = useQuery({
+    queryKey: ['supplier-wagons', selectedSupplier?._id],
+    queryFn: () => getSupplierWagons(selectedSupplier._id),
+    enabled: !!selectedSupplier?._id,
   });
 
   const createMutation = useMutation({
@@ -76,6 +84,74 @@ const Suppliers = () => {
     }
   };
 
+  const openDrawer = (record) => {
+    setSelectedSupplier(record);
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  // Helper: yog'och xaridi (RUB) summasi
+  const getWoodCost = (wagon) => {
+    const wood = (wagon.expenses || []).find(e => e.description === "Yog'och xaridi" && e.currency === 'RUB');
+    return wood ? wood.amount : 0;
+  };
+
+  const wagonColumns = [
+    {
+      title: 'Kod',
+      dataIndex: 'wagonCode',
+      key: 'wagonCode',
+      width: 110,
+    },
+    {
+      title: 'Turi',
+      dataIndex: 'type',
+      key: 'type',
+      width: 80,
+      render: (t) => t === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag>,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      render: (s) => <Tag color={statusColors[s]}>{statusLabels[s] || s}</Tag>,
+    },
+    {
+      title: 'Qayerdan',
+      dataIndex: 'origin',
+      key: 'origin',
+      width: 100,
+    },
+    {
+      title: 'Kelgan',
+      dataIndex: 'arrivedDate',
+      key: 'arrivedDate',
+      width: 100,
+      render: (v) => formatDate(v),
+    },
+    {
+      title: 'Jami m³',
+      dataIndex: 'totalM3',
+      key: 'totalM3',
+      width: 90,
+      render: (v) => formatM3(v),
+    },
+    {
+      title: "Yog'och (RUB)",
+      key: 'woodCost',
+      width: 120,
+      render: (_, r) => {
+        const amt = getWoodCost(r);
+        return amt ? amt.toLocaleString('ru') + ' ₽' : '—';
+      },
+    },
+  ];
+
   const columns = [
     { title: 'Ism', dataIndex: 'name', key: 'name' },
     { title: 'Telefon', dataIndex: 'phone', key: 'phone' },
@@ -91,6 +167,7 @@ const Suppliers = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
+          <Button icon={<EyeOutlined />} onClick={() => openDrawer(record)} />
           <Button icon={<EditOutlined />} onClick={() => openEdit(record)} />
           <Popconfirm
             title="Rusni o'chirishni tasdiqlaysizmi?"
@@ -121,6 +198,7 @@ const Suppliers = () => {
             <div className="grid-card-footer">
               <Text type="secondary" style={{ fontSize: 11 }}>{formatDate(s.createdAt)}</Text>
               <Space size="small">
+                <Button size="small" icon={<EyeOutlined />} onClick={() => openDrawer(s)} />
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(s)} />
                 <Popconfirm title="O'chirishni tasdiqlaysizmi?"
                   onConfirm={() => deleteMutation.mutate(s._id)}>
@@ -172,6 +250,7 @@ const Suppliers = () => {
         />
       )}
 
+      {/* Create / Edit Modal */}
       <Modal
         title={editingSupplier ? 'Rusni tahrirlash' : 'Rus qo\'shish'}
         open={modalOpen}
@@ -197,6 +276,46 @@ const Suppliers = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Supplier Detail Drawer */}
+      <Drawer
+        title={selectedSupplier?.name}
+        open={drawerOpen}
+        onClose={closeDrawer}
+        size="large"
+        width={760}
+      >
+        {selectedSupplier && (
+          <>
+            <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
+              <Descriptions.Item label="Telefon">{selectedSupplier.phone || '—'}</Descriptions.Item>
+              <Descriptions.Item label="Qo'shilgan">{formatDate(selectedSupplier.createdAt)}</Descriptions.Item>
+              {selectedSupplier.note && (
+                <Descriptions.Item label="Izoh" span={2}>{selectedSupplier.note}</Descriptions.Item>
+              )}
+            </Descriptions>
+
+            <h3 style={{ marginBottom: 12 }}>
+              Vagonlar
+              {supplierWagons && (
+                <Text type="secondary" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>
+                  ({supplierWagons.length} ta)
+                </Text>
+              )}
+            </h3>
+            <Table
+              rowKey="_id"
+              columns={wagonColumns}
+              dataSource={supplierWagons}
+              loading={wagonsLoading}
+              size="small"
+              pagination={false}
+              locale={{ emptyText: 'Vagon yo\'q' }}
+              scroll={{ x: 700 }}
+            />
+          </>
+        )}
+      </Drawer>
     </div>
   );
 };

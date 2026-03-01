@@ -137,6 +137,8 @@ export const updateSupplier = (id, data) =>
   api.put(`/suppliers/${id}`, data).then((r) => r.data);
 export const deleteSupplier = (id) =>
   api.delete(`/suppliers/${id}`).then((r) => r.data);
+export const getSupplierWagons = (id) =>
+  api.get(`/suppliers/${id}/wagons`).then((r) => r.data);
 
 // Settings
 export const getExchangeRate = () =>
