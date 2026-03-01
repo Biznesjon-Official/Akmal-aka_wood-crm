@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import {
   convertCurrency, getConversions, deleteConversion,
   createTopUp, getTopUps, deleteTopUp,
+  transferRub, getCashBalance,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 
@@ -15,8 +16,27 @@ export default function Transfers() {
   const queryClient = useQueryClient();
   const [convertOpen, setConvertOpen] = useState(false);
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [rubTransferOpen, setRubTransferOpen] = useState(false);
   const [convertForm] = Form.useForm();
   const [topUpForm] = Form.useForm();
+  const [rubTransferForm] = Form.useForm();
+
+  const { data: balance = {} } = useQuery({
+    queryKey: ['cash-balance'],
+    queryFn: getCashBalance,
+  });
+
+  const rubTransferMutation = useMutation({
+    mutationFn: transferRub,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
+      message.success('O\'tkazma amalga oshirildi');
+      setRubTransferOpen(false);
+      rubTransferForm.resetFields();
+    },
+    onError: () => message.error('Xatolik'),
+  });
 
   const { data: conversions = [], isLoading } = useQuery({
     queryKey: ['conversions'],
@@ -138,6 +158,28 @@ export default function Transfers() {
 
   return (
     <div>
+      {/* RUB accounts section */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+        <Title level={4} style={{ margin: 0 }}>RUB Hisoblar</Title>
+        <Button onClick={() => { rubTransferForm.resetFields(); setRubTransferOpen(true); }}>
+          Shaxsiy → Rossiya o'tkazma
+        </Button>
+      </div>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
+        <Card size="small" style={{ flex: 1 }}>
+          <Text type="secondary">Shaxsiy RUB</Text>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#1677ff', marginTop: 4 }}>
+            {formatMoney(balance?.RUB_personal || 0, 'RUB')}
+          </div>
+        </Card>
+        <Card size="small" style={{ flex: 1 }}>
+          <Text type="secondary">Rossiya RUB</Text>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#389e0d', marginTop: 4 }}>
+            {formatMoney(balance?.RUB_russia || 0, 'RUB')}
+          </div>
+        </Card>
+      </div>
+
       {/* Monthly avg rate display */}
       {currentRate > 0 && (
         <Card size="small" style={{ marginBottom: 16 }}>
@@ -228,6 +270,35 @@ export default function Transfers() {
                 </Card>
               );
             }}
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* RUB transfer modal */}
+      <Modal
+        title="Shaxsiy RUB → Rossiya RUB"
+        open={rubTransferOpen}
+        onCancel={() => { setRubTransferOpen(false); rubTransferForm.resetFields(); }}
+        onOk={() => rubTransferForm.submit()}
+        confirmLoading={rubTransferMutation.isPending}
+        okText="O'tkazish"
+        cancelText="Bekor qilish"
+      >
+        <Form form={rubTransferForm} layout="vertical" onFinish={(values) => {
+          rubTransferMutation.mutate({
+            amount: values.amount,
+            note: values.note,
+            date: values.date?.toISOString(),
+          });
+        }} initialValues={{ date: dayjs() }}>
+          <Form.Item name="amount" label="Summa (RUB)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="50000" />
+          </Form.Item>
+          <Form.Item name="date" label="Sana">
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="note" label="Izoh">
+            <Input placeholder="Izoh" />
           </Form.Item>
         </Form>
       </Modal>
