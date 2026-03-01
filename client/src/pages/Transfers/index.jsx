@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Table, Button, Modal, Form, InputNumber, DatePicker, Input, message, Card, Typography, Space, Popconfirm } from 'antd';
+import { Table, Button, Modal, Form, InputNumber, DatePicker, Input, message, Card, Typography, Space, Popconfirm, Segmented } from 'antd';
 import { PlusOutlined, DeleteOutlined, WalletOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -105,11 +105,20 @@ export default function Transfers() {
   });
 
   const handleConvert = (values) => {
-    const rubAmount = values.amountUSD * values.rate * (1 - (values.commissionPercent || 0) / 100);
+    const gross = values.amountUSD * values.rate;
+    let rubAmount, commPercent;
+    if (values.commissionType === 'amount') {
+      const commAmt = values.commissionAmount || 0;
+      rubAmount = gross - commAmt;
+      commPercent = gross > 0 ? (commAmt / gross) * 100 : 0;
+    } else {
+      commPercent = values.commissionPercent || 0;
+      rubAmount = gross * (1 - commPercent / 100);
+    }
     convertMutation.mutate({
       amountUSD: values.amountUSD,
       amountRUB: rubAmount,
-      commissionPercent: values.commissionPercent || 0,
+      commissionPercent: commPercent,
       date: values.date?.toISOString(),
       note: values.note,
     });
@@ -248,16 +257,38 @@ export default function Transfers() {
         okText="Saqlash"
         cancelText="Bekor qilish"
       >
-        <Form form={convertForm} layout="vertical" onFinish={handleConvert} initialValues={{ commissionPercent: 0, date: dayjs() }}>
+        <Form form={convertForm} layout="vertical" onFinish={handleConvert}
+          initialValues={{ commissionPercent: 0, commissionAmount: 0, commissionType: 'percent', date: dayjs() }}>
           <Form.Item name="amountUSD" label="Berilgan summa (USD)" rules={[{ required: true, message: 'USD summani kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="1000" />
           </Form.Item>
           <Form.Item name="rate" label="Kurs (1 USD = ? RUB)" rules={[{ required: true, message: 'Kursni kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder={currentRate || '9000'} />
           </Form.Item>
-          <Form.Item name="commissionPercent" label="Komissiya (%)">
-            <InputNumber style={{ width: '100%' }} min={0} max={100} placeholder="0" />
+
+          <Form.Item label="Komissiya">
+            <Space.Compact style={{ width: '100%' }}>
+              <Form.Item name="commissionType" noStyle>
+                <Segmented options={[{ label: '%', value: 'percent' }, { label: 'Summa (RUB)', value: 'amount' }]}
+                  onChange={() => convertForm.setFieldsValue({ commissionPercent: 0, commissionAmount: 0 })} />
+              </Form.Item>
+            </Space.Compact>
           </Form.Item>
+
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.commissionType !== cur.commissionType}>
+            {() => convertForm.getFieldValue('commissionType') === 'amount'
+              ? (
+                <Form.Item name="commissionAmount" label="Komissiya summasi (RUB)">
+                  <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                </Form.Item>
+              ) : (
+                <Form.Item name="commissionPercent" label="Komissiya (%)">
+                  <InputNumber style={{ width: '100%' }} min={0} max={100} placeholder="0" />
+                </Form.Item>
+              )
+            }
+          </Form.Item>
+
           <Form.Item name="date" label="Sana">
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
@@ -269,9 +300,15 @@ export default function Transfers() {
             {() => {
               const usd = convertForm.getFieldValue('amountUSD') || 0;
               const rate = convertForm.getFieldValue('rate') || 0;
-              const comm = convertForm.getFieldValue('commissionPercent') || 0;
+              const type = convertForm.getFieldValue('commissionType');
               if (!usd || !rate) return null;
-              const rub = usd * rate * (1 - comm / 100);
+              const gross = usd * rate;
+              let rub;
+              if (type === 'amount') {
+                rub = gross - (convertForm.getFieldValue('commissionAmount') || 0);
+              } else {
+                rub = gross * (1 - (convertForm.getFieldValue('commissionPercent') || 0) / 100);
+              }
               return (
                 <Card size="small" style={{ background: '#f6ffed' }}>
                   <div>Olinadigan summa: <Text strong style={{ color: '#389e0d', fontSize: 16 }}>+{formatMoney(rub, 'RUB')}</Text></div>
