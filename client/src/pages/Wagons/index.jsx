@@ -59,20 +59,36 @@ function flattenExpenses(fixed, wood, custom) {
 }
 
 // ===================== EXPENSES TABLE (shared) =====================
-function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd }) {
+function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd, rate = 0 }) {
   const usdTotal = fixed.reduce((s, e) => s + (e.amount || 0), 0) + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
+  const woodUsd = rate > 0 && wood.amount > 0 ? wood.amount / rate : null;
 
   return (
     <>
-      {/* Fixed USD expenses */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 4 }}>
         <thead>
           <tr>
             <th style={thS}>Xarajat turi</th>
-            <th style={{ ...thS, width: 150, textAlign: 'right' }}>Summa (USD)</th>
+            <th style={{ ...thS, width: 160, textAlign: 'right' }}>Summa</th>
           </tr>
         </thead>
         <tbody>
+          {/* Wood purchase (RUB) - FIRST row */}
+          <tr style={{ background: '#fffbe6', borderBottom: '1px solid #f0f0f0' }}>
+            <td style={{ ...cellS, fontWeight: 500 }}>
+              {WOOD_EXPENSE_KEY} <Tag color="orange" style={{ marginLeft: 4 }}>RUB</Tag>
+              {woodUsd && (
+                <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>
+                  ≈ {woodUsd.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} USD
+                </Text>
+              )}
+            </td>
+            <td style={{ ...cellS, textAlign: 'right' }}>
+              <InputNumber size="small" style={{ width: '100%' }} min={0}
+                value={wood.amount} onChange={(v) => onWoodChange(v || 0)} placeholder="0" />
+            </td>
+          </tr>
+          {/* Fixed USD expenses */}
           {fixed.map((exp, idx) => (
             <tr key={exp.description} style={{ borderBottom: '1px solid #f0f0f0' }}>
               <td style={cellS}>{exp.description}</td>
@@ -105,24 +121,9 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
         </tbody>
       </table>
 
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={onCustomAdd} style={{ marginBottom: 12 }}>
+      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={onCustomAdd} style={{ marginBottom: 4 }}>
         Qo'shimcha xarajat
       </Button>
-
-      {/* Wood purchase (RUB) - single row */}
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <tbody>
-          <tr style={{ background: '#fffbe6', borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ ...cellS, fontWeight: 500 }}>
-              {WOOD_EXPENSE_KEY} <Tag color="orange" style={{ marginLeft: 8 }}>RUB</Tag>
-            </td>
-            <td style={{ ...cellS, textAlign: 'right', width: 150 }}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0}
-                value={wood.amount} onChange={(v) => onWoodChange(v || 0)} placeholder="0" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </>
   );
 }
@@ -270,7 +271,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       {/* Expenses */}
       <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
       <ExpensesEditor
-        fixed={fixed} wood={wood} custom={custom}
+        fixed={fixed} wood={wood} custom={custom} rate={globalRate}
         onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
         onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
         onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
@@ -574,7 +575,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           {/* Edit expenses */}
           <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
           <ExpensesEditor
-            fixed={fixed} wood={wood} custom={custom}
+            fixed={fixed} wood={wood} custom={custom} rate={globalRate}
             onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
             onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
             onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
