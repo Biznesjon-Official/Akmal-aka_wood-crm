@@ -6,6 +6,11 @@ exports.getAll = async (req, res, next) => {
     const filter = {};
     if (req.query.sale) filter.sale = req.query.sale;
     if (req.query.customer) filter.customer = req.query.customer;
+    if (req.query.from || req.query.to) {
+      filter.date = {};
+      if (req.query.from) filter.date.$gte = new Date(req.query.from);
+      if (req.query.to) filter.date.$lte = new Date(req.query.to);
+    }
     const payments = await Payment.find(filter)
       .populate('customer')
       .populate('sale')

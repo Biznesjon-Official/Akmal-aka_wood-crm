@@ -4,6 +4,7 @@ import {
   DatePicker, Tag, message, Space, Input, Typography, Divider, Popconfirm,
   Row, Col, Card, Segmented,
 } from 'antd';
+const { RangePicker } = DatePicker;
 import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
@@ -18,6 +19,7 @@ const { Text } = Typography;
 export default function Sales() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table');
+  const [filters, setFilters] = useState({ from: undefined, to: undefined });
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { items: cartItems, removeItem, updateQuantity, clearCart, cartCount } = useCart();
@@ -34,8 +36,8 @@ export default function Sales() {
   const [totalFocused, setTotalFocused] = useState(false);
 
   const { data: sales = [], isLoading } = useQuery({
-    queryKey: ['sales'],
-    queryFn: getSales,
+    queryKey: ['sales', filters],
+    queryFn: () => getSales(filters),
   });
 
   const { data: customers = [] } = useQuery({
@@ -377,9 +379,17 @@ export default function Sales() {
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
         </Space>
-        <Button type="primary" icon={<ShoppingCartOutlined />} onClick={handleOpenNew}>
-          Yangi sotuv {cartCount > 0 && `(${cartCount})`}
-        </Button>
+        <Space>
+          <RangePicker
+            onChange={(dates) => setFilters({
+              from: dates?.[0]?.startOf('day').toISOString(),
+              to: dates?.[1]?.endOf('day').toISOString(),
+            })}
+          />
+          <Button type="primary" icon={<ShoppingCartOutlined />} onClick={handleOpenNew}>
+            Yangi sotuv {cartCount > 0 && `(${cartCount})`}
+          </Button>
+        </Space>
       </div>
 
       <Card className="summary-card" style={{ marginBottom: 16 }}>

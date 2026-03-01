@@ -37,7 +37,7 @@ export const getCustomerDebts = (id) =>
   api.get(`/customers/${id}/debts`).then((r) => r.data);
 
 // Salesad  f a fja;lf asdaoij a  k aslf ja fa;lkma ajfioaaaawlij mma,ozkpw f aa
-export const getSales = () => api.get("/sales").then((r) => r.data);
+export const getSales = (params) => api.get("/sales", { params }).then((r) => r.data);
 export const getSale = (id) => api.get(`/sales/${id}`).then((r) => r.data);
 export const createSale = (data) =>
   api.post("/sales", data).then((r) => r.data);
@@ -74,12 +74,12 @@ export const transferRub = (data) =>
   api.post("/transfers/rub-transfer", data).then((r) => r.data);
 export const getRubTransactions = (account) =>
   api.get("/cash-transactions", { params: { account } }).then((r) => r.data);
-export const getConversions = () =>
-  api.get("/transfers/conversions").then((r) => r.data);
+export const getConversions = (params) =>
+  api.get("/transfers/conversions", { params }).then((r) => r.data);
 export const deleteConversion = (id) =>
   api.delete(`/transfers/conversions/${id}`).then((r) => r.data);
-export const getTopUps = () =>
-  api.get("/transfers/top-ups").then((r) => r.data);
+export const getTopUps = (params) =>
+  api.get("/transfers/top-ups", { params }).then((r) => r.data);
 export const createTopUp = (data) =>
   api.post("/transfers/top-ups", data).then((r) => r.data);
 export const deleteTopUp = (id) =>

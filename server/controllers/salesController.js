@@ -5,7 +5,14 @@ const CashTransaction = require('../models/CashTransaction');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const sales = await Sale.find()
+    const { from, to } = req.query;
+    const filter = {};
+    if (from || to) {
+      filter.date = {};
+      if (from) filter.date.$gte = new Date(from);
+      if (to) filter.date.$lte = new Date(to);
+    }
+    const sales = await Sale.find(filter)
       .populate('customer')
       .sort({ createdAt: -1 })
       .lean();

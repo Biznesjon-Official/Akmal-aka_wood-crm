@@ -17,6 +17,7 @@ export default function Transfers() {
   const [convertOpen, setConvertOpen] = useState(false);
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [rubTransferOpen, setRubTransferOpen] = useState(false);
+  const [dateFilter, setDateFilter] = useState({ from: undefined, to: undefined });
   const [convertForm] = Form.useForm();
   const [topUpForm] = Form.useForm();
   const [rubTransferForm] = Form.useForm();
@@ -39,13 +40,13 @@ export default function Transfers() {
   });
 
   const { data: conversions = [], isLoading } = useQuery({
-    queryKey: ['conversions'],
-    queryFn: getConversions,
+    queryKey: ['conversions', dateFilter],
+    queryFn: () => getConversions(dateFilter),
   });
 
   const { data: topUps = [] } = useQuery({
-    queryKey: ['top-ups'],
-    queryFn: getTopUps,
+    queryKey: ['top-ups', dateFilter],
+    queryFn: () => getTopUps(dateFilter),
   });
 
   // Average rate from this month's conversions
@@ -190,6 +191,17 @@ export default function Transfers() {
           </Space>
         </Card>
       )}
+
+      {/* Date filter */}
+      <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Text type="secondary">Sana:</Text>
+        <DatePicker.RangePicker
+          onChange={(dates) => setDateFilter({
+            from: dates?.[0]?.startOf('day').toISOString(),
+            to: dates?.[1]?.endOf('day').toISOString(),
+          })}
+        />
+      </div>
 
       {/* Top-ups section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>

@@ -93,7 +93,14 @@ exports.convertCurrency = async (req, res, next) => {
 
 exports.getConversions = async (req, res, next) => {
   try {
-    const conversions = await CurrencyConversion.find().sort({ date: -1 }).lean();
+    const { from, to } = req.query;
+    const filter = {};
+    if (from || to) {
+      filter.date = {};
+      if (from) filter.date.$gte = new Date(from);
+      if (to) filter.date.$lte = new Date(to);
+    }
+    const conversions = await CurrencyConversion.find(filter).sort({ date: -1 }).lean();
     res.json(conversions);
   } catch (err) { next(err); }
 };
@@ -133,7 +140,14 @@ exports.createTopUp = async (req, res, next) => {
 
 exports.getTopUps = async (req, res, next) => {
   try {
-    const topUps = await TopUp.find().sort({ date: -1 }).lean();
+    const { from, to } = req.query;
+    const filter = {};
+    if (from || to) {
+      filter.date = {};
+      if (from) filter.date.$gte = new Date(from);
+      if (to) filter.date.$lte = new Date(to);
+    }
+    const topUps = await TopUp.find(filter).sort({ date: -1 }).lean();
     res.json(topUps);
   } catch (err) { next(err); }
 };
