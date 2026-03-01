@@ -9,10 +9,12 @@ import {
   transferRub, getCashBalance,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { Text, Title } = Typography;
 
 export default function Transfers() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [convertOpen, setConvertOpen] = useState(false);
   const [topUpOpen, setTopUpOpen] = useState(false);
@@ -32,11 +34,11 @@ export default function Transfers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
-      message.success('O\'tkazma amalga oshirildi');
+      message.success(t('transferSuccess'));
       setRubTransferOpen(false);
       rubTransferForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const { data: conversions = [], isLoading } = useQuery({
@@ -62,11 +64,11 @@ export default function Transfers() {
       queryClient.invalidateQueries({ queryKey: ['conversions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
-      message.success('Konversiya saqlandi');
+      message.success(t('conversionSaved'));
       setConvertOpen(false);
       convertForm.resetFields();
     },
-    onError: () => message.error('Konversiya xatolik'),
+    onError: () => message.error(t('conversionError')),
   });
 
   const deleteConvMutation = useMutation({
@@ -76,7 +78,7 @@ export default function Transfers() {
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      message.success("O'chirildi");
+      message.success(t('deleted'));
     },
   });
 
@@ -86,11 +88,11 @@ export default function Transfers() {
       queryClient.invalidateQueries({ queryKey: ['top-ups'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
-      message.success('Hisob to\'ldirildi');
+      message.success(t('topUpSuccess'));
       setTopUpOpen(false);
       topUpForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const deleteTopUpMutation = useMutation({
@@ -100,7 +102,7 @@ export default function Transfers() {
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      message.success("O'chirildi");
+      message.success(t('deleted'));
     },
   });
 
@@ -126,22 +128,22 @@ export default function Transfers() {
 
   // Conversion columns
   const convColumns = [
-    { title: 'Sana', dataIndex: 'date', key: 'date', render: formatDate },
-    { title: 'USD bergan', dataIndex: 'amountUSD', key: 'amountUSD', render: (v) => <Text type="danger" strong>−{formatMoney(v, 'USD')}</Text> },
-    { title: 'RUB olgan', dataIndex: 'amountRUB', key: 'amountRUB', render: (v) => <Text style={{ color: '#389e0d' }} strong>+{formatMoney(v, 'RUB')}</Text> },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+    { title: t('usdGiven'), dataIndex: 'amountUSD', key: 'amountUSD', render: (v) => <Text type="danger" strong>−{formatMoney(v, 'USD')}</Text> },
+    { title: t('rubReceived'), dataIndex: 'amountRUB', key: 'amountRUB', render: (v) => <Text style={{ color: '#389e0d' }} strong>+{formatMoney(v, 'RUB')}</Text> },
     {
-      title: 'Kurs', dataIndex: 'effectiveRate', key: 'effectiveRate',
+      title: t('rate'), dataIndex: 'effectiveRate', key: 'effectiveRate',
       render: (v) => <Text strong>1 USD = {v?.toFixed(2)} RUB</Text>,
     },
     {
-      title: 'Komissiya', dataIndex: 'commissionPercent', key: 'commissionPercent',
+      title: t('commission'), dataIndex: 'commissionPercent', key: 'commissionPercent',
       render: (v) => v ? `${v}%` : '—',
     },
-    { title: 'Izoh', dataIndex: 'note', key: 'note', ellipsis: true },
+    { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
     {
       title: '', key: 'actions',
       render: (_, r) => (
-        <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteConvMutation.mutate(r._id)}>
+        <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteConvMutation.mutate(r._id)}>
           <Button size="small" type="text" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       ),
@@ -150,16 +152,16 @@ export default function Transfers() {
 
   // Top-up columns
   const topUpColumns = [
-    { title: 'Sana', dataIndex: 'date', key: 'date', render: formatDate },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
     {
-      title: 'Summa', dataIndex: 'amount', key: 'amount',
+      title: t('amount'), dataIndex: 'amount', key: 'amount',
       render: (v, r) => <Text style={{ color: '#389e0d' }} strong>+{formatMoney(v, r.currency)}</Text>,
     },
-    { title: 'Izoh', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
     {
       title: '', key: 'actions',
       render: (_, r) => (
-        <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteTopUpMutation.mutate(r._id)}>
+        <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteTopUpMutation.mutate(r._id)}>
           <Button size="small" type="text" danger icon={<DeleteOutlined />} />
         </Popconfirm>
       ),
@@ -170,20 +172,20 @@ export default function Transfers() {
     <div>
       {/* RUB accounts section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Title level={4} style={{ margin: 0 }}>RUB Hisoblar</Title>
+        <Title level={4} style={{ margin: 0 }}>{t('rubAccounts')}</Title>
         <Button onClick={() => { rubTransferForm.resetFields(); setRubTransferOpen(true); }}>
-          Shaxsiy → Rossiya o'tkazma
+          {t('personalToRussia')}
         </Button>
       </div>
       <div style={{ display: 'flex', gap: 16, marginBottom: 24 }}>
         <Card size="small" style={{ flex: 1 }}>
-          <Text type="secondary">Shaxsiy RUB</Text>
+          <Text type="secondary">{t('personalRub')}</Text>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#1677ff', marginTop: 4 }}>
             {formatMoney(balance?.RUB_personal || 0, 'RUB')}
           </div>
         </Card>
         <Card size="small" style={{ flex: 1 }}>
-          <Text type="secondary">Rossiya RUB</Text>
+          <Text type="secondary">{t('russiaRub')}</Text>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#389e0d', marginTop: 4 }}>
             {formatMoney(balance?.RUB_russia || 0, 'RUB')}
           </div>
@@ -194,16 +196,16 @@ export default function Transfers() {
       {currentRate > 0 && (
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space>
-            <Text strong>Shu oylik o'rtacha kurs:</Text>
+            <Text strong>{t('monthlyAvgRate')}</Text>
             <Text strong style={{ fontSize: 16, color: '#1677ff' }}>1 USD = {currentRate.toFixed(2)} RUB</Text>
-            <Text type="secondary">({monthConversions.length} ta konversiya asosida)</Text>
+            <Text type="secondary">{t('conversionBasis').replace('{count}', monthConversions.length)}</Text>
           </Space>
         </Card>
       )}
 
       {/* Date filter */}
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Text type="secondary">Sana:</Text>
+        <Text type="secondary">{t('date')}:</Text>
         <DatePicker.RangePicker
           onChange={(dates) => setDateFilter({
             from: dates?.[0]?.startOf('day').toISOString(),
@@ -214,9 +216,9 @@ export default function Transfers() {
 
       {/* Top-ups section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}><WalletOutlined /> Hisobni to'ldirish</Title>
+        <Title level={4} style={{ margin: 0 }}><WalletOutlined /> {t('topUp')}</Title>
         <Button style={{ background: '#389e0d', color: '#fff' }} onClick={() => { topUpForm.resetFields(); setTopUpOpen(true); }}>
-          + To'ldirish
+          {t('addTopUp')}
         </Button>
       </div>
 
@@ -233,9 +235,9 @@ export default function Transfers() {
 
       {/* Conversions section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={4} style={{ margin: 0 }}>Valyuta almashtirishlar</Title>
+        <Title level={4} style={{ margin: 0 }}>{t('conversions')}</Title>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => { convertForm.resetFields(); setConvertOpen(true); }}>
-          Yangi o'tkazish
+          {t('newConversion')}
         </Button>
       </div>
 
@@ -249,24 +251,24 @@ export default function Transfers() {
 
       {/* Convert modal */}
       <Modal
-        title="USD → RUB o'tkazish"
+        title={t('conversionModal')}
         open={convertOpen}
         onCancel={() => { setConvertOpen(false); convertForm.resetFields(); }}
         onOk={() => convertForm.submit()}
         confirmLoading={convertMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         <Form form={convertForm} layout="vertical" onFinish={handleConvert}
           initialValues={{ commissionPercent: 0, commissionAmount: 0, commissionType: 'percent', date: dayjs() }}>
-          <Form.Item name="amountUSD" label="Berilgan summa (USD)" rules={[{ required: true, message: 'USD summani kiriting' }]}>
+          <Form.Item name="amountUSD" label={t('givenAmountUsd')} rules={[{ required: true, message: 'USD summani kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="1000" />
           </Form.Item>
-          <Form.Item name="rate" label="Kurs (1 USD = ? RUB)" rules={[{ required: true, message: 'Kursni kiriting' }]}>
+          <Form.Item name="rate" label={t('rateLabel')} rules={[{ required: true, message: 'Kursni kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder={currentRate || '9000'} />
           </Form.Item>
 
-          <Form.Item label="Komissiya">
+          <Form.Item label={t('commission')}>
             <Space.Compact style={{ width: '100%' }}>
               <Form.Item name="commissionType" noStyle>
                 <Segmented options={[{ label: '%', value: 'percent' }, { label: 'Summa (RUB)', value: 'amount' }]}
@@ -278,22 +280,22 @@ export default function Transfers() {
           <Form.Item noStyle shouldUpdate={(prev, cur) => prev.commissionType !== cur.commissionType}>
             {() => convertForm.getFieldValue('commissionType') === 'amount'
               ? (
-                <Form.Item name="commissionAmount" label="Komissiya summasi (RUB)">
+                <Form.Item name="commissionAmount" label={t('commissionAmt')}>
                   <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
                 </Form.Item>
               ) : (
-                <Form.Item name="commissionPercent" label="Komissiya (%)">
+                <Form.Item name="commissionPercent" label={t('commissionPct')}>
                   <InputNumber style={{ width: '100%' }} min={0} max={100} placeholder="0" />
                 </Form.Item>
               )
             }
           </Form.Item>
 
-          <Form.Item name="date" label="Sana">
+          <Form.Item name="date" label={t('date')}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
 
           <Form.Item noStyle shouldUpdate>
@@ -311,9 +313,9 @@ export default function Transfers() {
               }
               return (
                 <Card size="small" style={{ background: '#f6ffed' }}>
-                  <div>Olinadigan summa: <Text strong style={{ color: '#389e0d', fontSize: 16 }}>+{formatMoney(rub, 'RUB')}</Text></div>
+                  <div>{t('receivedAmount')} <Text strong style={{ color: '#389e0d', fontSize: 16 }}>+{formatMoney(rub, 'RUB')}</Text></div>
                   <div style={{ marginTop: 4 }}>
-                    <Text type="secondary">Effektiv kurs: </Text>
+                    <Text type="secondary">{t('effectiveRate')} </Text>
                     <Text strong>1 USD = {(rub / usd).toFixed(2)} RUB</Text>
                   </div>
                 </Card>
@@ -325,13 +327,13 @@ export default function Transfers() {
 
       {/* RUB transfer modal */}
       <Modal
-        title="Shaxsiy RUB → Rossiya RUB"
+        title={t('rubTransferModal')}
         open={rubTransferOpen}
         onCancel={() => { setRubTransferOpen(false); rubTransferForm.resetFields(); }}
         onOk={() => rubTransferForm.submit()}
         confirmLoading={rubTransferMutation.isPending}
-        okText="O'tkazish"
-        cancelText="Bekor qilish"
+        okText={t('transfer')}
+        cancelText={t('cancel')}
       >
         <Form form={rubTransferForm} layout="vertical" onFinish={(values) => {
           rubTransferMutation.mutate({
@@ -340,44 +342,44 @@ export default function Transfers() {
             date: values.date?.toISOString(),
           });
         }} initialValues={{ date: dayjs() }}>
-          <Form.Item name="amount" label="Summa (RUB)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+          <Form.Item name="amount" label={t('amountRub')} rules={[{ required: true, message: 'Summani kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="50000" />
           </Form.Item>
-          <Form.Item name="date" label="Sana">
+          <Form.Item name="date" label={t('date')}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Top-up modal */}
       <Modal
-        title="Hisobni to'ldirish"
+        title={t('topUpModal')}
         open={topUpOpen}
         onCancel={() => { setTopUpOpen(false); topUpForm.resetFields(); }}
         onOk={() => topUpForm.submit()}
         confirmLoading={topUpMutation.isPending}
-        okText="To'ldirish"
-        cancelText="Bekor qilish"
+        okText={t('topUp')}
+        cancelText={t('cancel')}
       >
         <Form form={topUpForm} layout="vertical" onFinish={(values) => {
           topUpMutation.mutate({
             amount: values.amount,
             currency: 'USD',
-            description: values.description || 'Hisobni to\'ldirish',
+            description: values.description || t('topUp'),
             date: values.date?.toISOString(),
           });
         }} initialValues={{ date: dayjs() }}>
-          <Form.Item name="amount" label="Summa (USD)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+          <Form.Item name="amount" label={t('topUpAmountUsd')} rules={[{ required: true, message: 'Summani kiriting' }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="5000" />
           </Form.Item>
-          <Form.Item name="date" label="Sana">
+          <Form.Item name="date" label={t('date')}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="description" label="Izoh">
-            <Input placeholder="Hisobni to'ldirish" />
+          <Form.Item name="description" label={t('note')}>
+            <Input placeholder={t('topUp')} />
           </Form.Item>
         </Form>
       </Modal>

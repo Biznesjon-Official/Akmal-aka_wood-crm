@@ -12,11 +12,13 @@ import dayjs from 'dayjs';
 import { getSales, createSale, getCustomers } from '../../api';
 import { formatDate, formatMoney, formatM3 } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
+import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
 
 const { Text } = Typography;
 
 export default function Sales() {
+  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [filters, setFilters] = useState({ from: undefined, to: undefined });
@@ -89,7 +91,7 @@ export default function Sales() {
   const mutation = useMutation({
     mutationFn: createSale,
     onSuccess: () => {
-      message.success('Sotuv muvaffaqiyatli yaratildi');
+      message.success(t('saleCreated'));
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['wagons'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -98,7 +100,7 @@ export default function Sales() {
       setOpen(false);
     },
     onError: (err) => {
-      message.error(err?.response?.data?.message || 'Xatolik yuz berdi');
+      message.error(err?.response?.data?.message || t('error'));
     },
   });
 
@@ -113,12 +115,12 @@ export default function Sales() {
   };
 
   const handleSubmit = () => {
-    if (!customer) { message.warning('Mijozni tanlang'); return; }
-    if (cartItems.length === 0) { message.warning('Savatcha bo\'sh'); return; }
+    if (!customer) { message.warning(t('selectCustomer')); return; }
+    if (cartItems.length === 0) { message.warning(t('emptyCartMsg')); return; }
 
     const finalTotal = totalAmount;
     if (!finalTotal || finalTotal <= 0) {
-      message.warning('Jami sotuv narxini kiriting');
+      message.warning(t('totalSale'));
       return;
     }
 
@@ -192,7 +194,7 @@ export default function Sales() {
 
   const handleOpenNew = () => {
     if (cartCount === 0) {
-      message.info('Avval savatchaga mahsulot qo\'shing');
+      message.info(t('emptyCart'));
       return;
     }
     resetForm();
@@ -208,13 +210,13 @@ export default function Sales() {
       width: 100,
     },
     {
-      title: "O'lcham",
+      title: t('size'),
       key: 'dimension',
       width: 120,
       render: (_, r) => `${r.thickness}mm × ${r.width}mm × ${r.length}m`,
     },
     {
-      title: 'Soni',
+      title: t('count'),
       key: 'quantity',
       width: 90,
       render: (_, r) => (
@@ -240,7 +242,7 @@ export default function Sales() {
             <Text strong>{formatMoney(Math.round(costPerM3), currency)}</Text>
             <br />
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Jami: {formatMoney(totalCost, currency)}
+              {t('total')}: {formatMoney(totalCost, currency)}
             </Text>
           </div>
         );
@@ -262,7 +264,7 @@ export default function Sales() {
               addonAfter={currency} />
             {pricePerM3 > 0 && (
               <Text type="secondary" style={{ fontSize: 11, display: 'block', marginTop: 2 }}>
-                Jami: {formatMoney(rowTotal, currency)}
+                {t('total')}: {formatMoney(rowTotal, currency)}
               </Text>
             )}
           </div>
@@ -283,30 +285,30 @@ export default function Sales() {
   // Sales list table columns
   const columns = [
     {
-      title: 'Sana',
+      title: t('date'),
       dataIndex: 'date',
       key: 'date',
       render: (val) => formatDate(val),
     },
     {
-      title: 'Mijoz',
+      title: t('customer'),
       dataIndex: ['customer', 'name'],
       key: 'customer',
     },
     {
-      title: 'Jami summa',
+      title: t('totalSale'),
       dataIndex: 'totalAmount',
       key: 'totalAmount',
       render: (val, rec) => formatMoney(val, rec.currency),
     },
     {
-      title: "To'langan",
+      title: t('paid'),
       dataIndex: 'paidAmount',
       key: 'paidAmount',
       render: (val, rec) => formatMoney(val, rec.currency),
     },
     {
-      title: 'Qarz',
+      title: t('debt'),
       key: 'debt',
       render: (_, rec) => {
         const debt = (rec.totalAmount || 0) - (rec.paidAmount || 0);
@@ -323,7 +325,7 @@ export default function Sales() {
       render: (_, rec) => (rec.items?.length || 0),
     },
     {
-      title: 'Izoh',
+      title: t('note'),
       dataIndex: 'note',
       key: 'note',
       ellipsis: true,
@@ -343,22 +345,22 @@ export default function Sales() {
                 <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(sale.date)}</Text>
               </div>
               <div className="grid-card-row">
-                <Text type="secondary">Jami:</Text>
+                <Text type="secondary">{t('total')}:</Text>
                 <Text strong>{formatMoney(sale.totalAmount, sale.currency)}</Text>
               </div>
               <div className="grid-card-row">
-                <Text type="secondary">To'langan:</Text>
+                <Text type="secondary">{t('paid')}:</Text>
                 <Text style={{ color: '#52c41a' }}>{formatMoney(sale.paidAmount, sale.currency)}</Text>
               </div>
               {debt > 0 && (
                 <div className="grid-card-row">
-                  <Text type="secondary">Qarz:</Text>
+                  <Text type="secondary">{t('debt')}:</Text>
                   <Text type="danger" strong>{formatMoney(debt, sale.currency)}</Text>
                 </div>
               )}
               <div className="grid-card-footer">
                 <Tag>{sale.items?.length || 0} mahsulot</Tag>
-                {isPaid ? <Tag color="success">To'langan</Tag> : <Tag color="error">Qarzda</Tag>}
+                {isPaid ? <Tag color="success">{t('paid')}</Tag> : <Tag color="error">{t('debt')}da</Tag>}
               </div>
               {sale.note && <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }} ellipsis>{sale.note}</Text>}
             </Card>
@@ -372,7 +374,7 @@ export default function Sales() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <h2 style={{ margin: 0 }}>Sotuvlar</h2>
+          <h2 style={{ margin: 0 }}>{t('salesPage')}</h2>
           <Segmented value={viewMode} onChange={setViewMode}
             options={[
               { value: 'card', icon: <AppstoreOutlined /> },
@@ -387,7 +389,7 @@ export default function Sales() {
             })}
           />
           <Button type="primary" icon={<ShoppingCartOutlined />} onClick={handleOpenNew}>
-            Yangi sotuv {cartCount > 0 && `(${cartCount})`}
+            {t('newSale')} {cartCount > 0 && `(${cartCount})`}
           </Button>
         </Space>
       </div>
@@ -395,19 +397,19 @@ export default function Sales() {
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami sotuvlar</span>
+            <span className="summary-stat-label">{t('totalSales')}</span>
             <span className="summary-stat-value">{sales.length}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami summa</span>
+            <span className="summary-stat-label">{t('totalSale')}</span>
             <span className="summary-stat-value highlight">{formatMoney(sales.reduce((s, x) => s + (x.totalAmount || 0), 0), 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">To'langan</span>
+            <span className="summary-stat-label">{t('paid')}</span>
             <span className="summary-stat-value" style={{ color: '#52c41a' }}>{formatMoney(sales.reduce((s, x) => s + (x.paidAmount || 0), 0), 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Qarz</span>
+            <span className="summary-stat-label">{t('debt')}</span>
             <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(sales.reduce((s, x) => s + Math.max(0, (x.totalAmount || 0) - (x.paidAmount || 0)), 0), 'USD')}</span>
           </div>
         </div>
@@ -424,7 +426,7 @@ export default function Sales() {
       )}
 
       <Modal
-        title={`Yangi sotuv (${cartItems.length} mahsulot)`}
+        title={`${t('newSale')} (${cartItems.length} mahsulot)`}
         open={open}
         onCancel={() => { setOpen(false); resetForm(); }}
         footer={null}
@@ -436,7 +438,7 @@ export default function Sales() {
           <div style={{ textAlign: 'center', padding: 40 }}>
             <ShoppingCartOutlined style={{ fontSize: 48, color: '#d9d9d9' }} />
             <div style={{ marginTop: 12 }}>
-              <Text type="secondary">Savatcha bo'sh. Avval ombordan mahsulot qo'shing.</Text>
+              <Text type="secondary">{t('emptyCart')}</Text>
             </div>
           </div>
         ) : (
@@ -449,17 +451,17 @@ export default function Sales() {
             <Space direction="vertical" style={{ width: '100%' }} size="middle">
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 <div style={{ flex: 1, minWidth: 180 }}>
-                  <Text type="secondary">Mijoz</Text>
-                  <Select placeholder="Mijoz tanlang" showSearch optionFilterProp="label"
+                  <Text type="secondary">{t('customer')}</Text>
+                  <Select placeholder={t('selectCustomer')} showSearch optionFilterProp="label"
                     value={customer} onChange={setCustomer} style={{ width: '100%' }}
                     options={customers.map((c) => ({ value: c._id, label: c.name }))} />
                 </div>
                 <div>
-                  <Text type="secondary">Sana</Text>
+                  <Text type="secondary">{t('date')}</Text>
                   <DatePicker value={date} onChange={setDate} format="DD.MM.YYYY" style={{ width: '100%' }} />
                 </div>
                 <div>
-                  <Text type="secondary">Valyuta</Text>
+                  <Text type="secondary">{t('currency')}</Text>
                   <Select value={currency} onChange={setCurrency} style={{ width: 90 }}
                     options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
                 </div>
@@ -467,13 +469,13 @@ export default function Sales() {
 
               <div style={{ display: 'flex', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <Text type="secondary">To'langan summa</Text>
+                  <Text type="secondary">{t('paidAmount')}</Text>
                   <InputNumber min={0} value={paidAmount} onChange={setPaidAmount} style={{ width: '100%' }} />
                 </div>
               </div>
 
               <div>
-                <Text type="secondary">Izoh</Text>
+                <Text type="secondary">{t('note')}</Text>
                 <Input.TextArea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
 
@@ -481,7 +483,7 @@ export default function Sales() {
                 padding: 12, background: '#f6f6f6', borderRadius: 8,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
-                <Text type="secondary" style={{ fontSize: 14 }}>Jami tannarx:</Text>
+                <Text type="secondary" style={{ fontSize: 14 }}>{t('totalCostLabel')}</Text>
                 <Text strong style={{ fontSize: 16 }}>{formatMoney(totalCostPrice, currency)}</Text>
               </div>
 
@@ -490,7 +492,7 @@ export default function Sales() {
                   padding: 8, background: '#fffbe6', borderRadius: 8,
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 }}>
-                  <Text type="secondary" style={{ fontSize: 13 }}>Foyda:</Text>
+                  <Text type="secondary" style={{ fontSize: 13 }}>{t('profit')}</Text>
                   <Text strong style={{ fontSize: 14, color: autoTotal > totalCostPrice ? '#52c41a' : '#cf1322' }}>
                     {formatMoney(autoTotal - totalCostPrice, currency)} ({totalCostPrice > 0 ? Math.round((autoTotal - totalCostPrice) / totalCostPrice * 100) : 0}%)
                   </Text>
@@ -501,7 +503,7 @@ export default function Sales() {
                 padding: 12, background: '#f6ffed', borderRadius: 8,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
               }}>
-                <Text strong style={{ fontSize: 16 }}>Jami sotuv:</Text>
+                <Text strong style={{ fontSize: 16 }}>{t('totalSale')}</Text>
                 <InputNumber
                   min={0}
                   value={totalFocused ? totalInputValue : totalAmount}
@@ -524,7 +526,7 @@ export default function Sales() {
               {totalAmount > 0 && paidAmount < totalAmount && (
                 <div style={{ padding: '4px 12px', background: '#fff2f0', borderRadius: 8 }}>
                   <Text type="danger">
-                    Qarz: {formatMoney(totalAmount - paidAmount, currency)}
+                    {t('debt')}: {formatMoney(totalAmount - paidAmount, currency)}
                   </Text>
                 </div>
               )}
@@ -532,7 +534,7 @@ export default function Sales() {
               <Button type="primary" block size="large"
                 loading={mutation.isPending} onClick={handleSubmit}
                 style={{ height: 48, fontWeight: 600, fontSize: 16 }}>
-                Sotuvni yaratish
+                {t('createSale')}
               </Button>
             </Space>
           </>

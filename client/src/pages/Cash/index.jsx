@@ -13,23 +13,10 @@ import {
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
-
-const typeOptions = [
-  { value: 'kirim', label: 'Kirim' },
-  { value: 'chiqim', label: 'Chiqim' },
-];
-
-const kirimSourceOptions = [
-  { value: 'sotuv', label: 'Yog\'och sotuvi' },
-  { value: 'qarz_tolovi', label: 'Qarz to\'lovi' },
-  { value: 'yetkazma', label: 'Yetkazma daromadi' },
-  { value: 'boshqa', label: 'Boshqa' },
-];
-
-const kirimSourceMap = Object.fromEntries(kirimSourceOptions.map((o) => [o.value, o.label]));
 
 const currencyOptions = [
   { value: 'USD', label: 'USD' },
@@ -43,6 +30,7 @@ const accountOptions = [
 ];
 
 export default function Cash() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState('table');
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,6 +53,20 @@ export default function Cash() {
   const [selectedWagonIds, setSelectedWagonIds] = useState([]);
   const [profitData, setProfitData] = useState(null);
   const [calcLoading, setCalcLoading] = useState(false);
+
+  const typeOptions = [
+    { value: 'kirim', label: t('income') },
+    { value: 'chiqim', label: t('expense') },
+  ];
+
+  const kirimSourceOptions = [
+    { value: 'sotuv', label: t('woodSales') },
+    { value: 'qarz_tolovi', label: t('debtPayment') },
+    { value: 'yetkazma', label: t('deliveryIncome') },
+    { value: 'boshqa', label: t('other') },
+  ];
+
+  const kirimSourceMap = Object.fromEntries(kirimSourceOptions.map((o) => [o.value, o.label]));
 
   const { data: transactions = [], isLoading } = useQuery({
     queryKey: ['cash-transactions', filters],
@@ -93,7 +95,7 @@ export default function Cash() {
 
   const createMutation = useMutation({
     mutationFn: createCashTransaction,
-    onError: (err) => message.error(err?.response?.data?.message || 'Xatolik yuz berdi'),
+    onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
   const createSourceMutation = useMutation({
@@ -101,9 +103,9 @@ export default function Cash() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expense-sources'] });
       setNewSourceName('');
-      message.success('Manba qo\'shildi');
+      message.success(t('sourceAdded'));
     },
-    onError: (err) => message.error(err?.response?.data?.message || 'Xatolik'),
+    onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
   const updateSourceMutation = useMutation({
@@ -112,18 +114,18 @@ export default function Cash() {
       queryClient.invalidateQueries({ queryKey: ['expense-sources'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       setEditingSource(null);
-      message.success('Manba yangilandi');
+      message.success(t('sourceUpdated'));
     },
-    onError: (err) => message.error(err?.response?.data?.message || 'Xatolik'),
+    onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
   const deleteSourceMutation = useMutation({
     mutationFn: deleteExpenseSource,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expense-sources'] });
-      message.success('Manba o\'chirildi');
+      message.success(t('sourceDeleted'));
     },
-    onError: (err) => message.error(err?.response?.data?.message || 'Xatolik'),
+    onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
   const handleCreate = async (values) => {
@@ -162,7 +164,7 @@ export default function Cash() {
       }
 
       invalidateCash();
-      message.success(modalType === 'kirim' ? 'Kirim qo\'shildi' : 'Xarajat qo\'shildi');
+      message.success(modalType === 'kirim' ? t('incomeAdded') : t('expenseAdded'));
       setModalOpen(false);
       setPartnerEnabled(false);
       form.resetFields();
@@ -203,7 +205,7 @@ export default function Cash() {
     try {
       const data = await getWagonProfitSummary(selectedWagonIds);
       setProfitData(data);
-    } catch { message.error('Xatolik'); }
+    } catch { message.error(t('error')); }
     finally { setCalcLoading(false); }
   };
 
@@ -224,8 +226,8 @@ export default function Cash() {
   const chiqimSourceOptions = sources.map((s) => ({ value: s._id, label: s.name }));
 
   const categoryLabels = {
-    sotuv: 'Yog\'och sotuvi', qarz_tolovi: 'Qarz to\'lovi', yetkazma: 'Yetkazma',
-    xarid: 'Yog\'och xaridi', transport: 'Transport', soliq: 'Soliq', boshqa: 'Boshqa',
+    sotuv: t('woodSales'), qarz_tolovi: t('debtPayment'), yetkazma: t('deliveryIncome'),
+    xarid: "Yog'och xaridi", transport: 'Transport', soliq: 'Soliq', boshqa: t('other'),
   };
 
   const getSourceName = (record) => {
@@ -237,14 +239,14 @@ export default function Cash() {
   };
 
   const columns = [
-    { title: 'Sana', dataIndex: 'date', key: 'date', render: formatDate },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
     {
-      title: 'Turi', dataIndex: 'type', key: 'type',
-      render: (type) => <Tag color={type === 'kirim' ? 'green' : 'red'}>{type === 'kirim' ? 'Kirim' : 'Chiqim'}</Tag>,
+      title: t('type'), dataIndex: 'type', key: 'type',
+      render: (type) => <Tag color={type === 'kirim' ? 'green' : 'red'}>{type === 'kirim' ? t('income') : t('expense')}</Tag>,
     },
-    { title: 'Manba', key: 'source', render: (_, record) => getSourceName(record) },
+    { title: t('source'), key: 'source', render: (_, record) => getSourceName(record) },
     {
-      title: 'Summa', dataIndex: 'amount', key: 'amount',
+      title: t('amount'), dataIndex: 'amount', key: 'amount',
       render: (amount, record) => (
         <span style={{ color: record.type === 'chiqim' ? '#cf1322' : '#389e0d', fontWeight: 500 }}>
           {record.type === 'chiqim' ? '−' : '+'}{formatMoney(amount, record.currency)}
@@ -252,10 +254,10 @@ export default function Cash() {
       ),
     },
     {
-      title: 'Hisob', dataIndex: 'account', key: 'account',
+      title: t('account'), dataIndex: 'account', key: 'account',
       render: (acc) => accountOptions.find((a) => a.value === acc)?.label || acc,
     },
-    { title: 'Izoh', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
   ];
 
   // Compute summary stats from all transactions (unfiltered would be ideal, but use filtered as proxy)
@@ -269,39 +271,39 @@ export default function Cash() {
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Balans (USD)</span>
+            <span className="summary-stat-label">{t('balanceUsd')}</span>
             <span className="summary-stat-value highlight">{formatMoney(balance?.USD, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Shaxsiy RUB</span>
+            <span className="summary-stat-label">{t('personalRub')}</span>
             <span className="summary-stat-value">{(balance?.RUB_personal || 0).toLocaleString('ru')} ₽</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Rossiya RUB</span>
+            <span className="summary-stat-label">{t('russiaRub')}</span>
             <span className="summary-stat-value">{(balance?.RUB_russia || 0).toLocaleString('ru')} ₽</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Kirim (USD)</span>
+            <span className="summary-stat-label">{t('incomeUsd')}</span>
             <span className="summary-stat-value" style={{ color: '#52c41a' }}>+{formatMoney(totalKirimUSD, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Chiqim (USD)</span>
+            <span className="summary-stat-label">{t('expenseUsd')}</span>
             <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>−{formatMoney(totalChiqimUSD, 'USD')}</span>
           </div>
           {totalKirimRUB > 0 && (
             <div className="summary-stat">
-              <span className="summary-stat-label">Kirim (RUB)</span>
+              <span className="summary-stat-label">{t('incomeRub')}</span>
               <span className="summary-stat-value" style={{ color: '#52c41a' }}>+{formatMoney(totalKirimRUB, 'RUB')}</span>
             </div>
           )}
           {totalChiqimRUB > 0 && (
             <div className="summary-stat">
-              <span className="summary-stat-label">Chiqim (RUB)</span>
+              <span className="summary-stat-label">{t('expenseRub')}</span>
               <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>−{formatMoney(totalChiqimRUB, 'RUB')}</span>
             </div>
           )}
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami tranzaksiya</span>
+            <span className="summary-stat-label">{t('totalTransactions')}</span>
             <span className="summary-stat-value">{transactions.length}</span>
           </div>
         </div>
@@ -314,24 +316,24 @@ export default function Cash() {
               { value: 'card', icon: <AppstoreOutlined /> },
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
-          <Select placeholder="Turi" allowClear style={{ width: 150 }} options={typeOptions}
+          <Select placeholder={t('type')} allowClear style={{ width: 150 }} options={typeOptions}
             onChange={(val) => setFilters((prev) => ({ ...prev, type: val }))} />
-          <Select placeholder="Chiqim manbasi" allowClear style={{ width: 170 }} options={chiqimSourceOptions}
+          <Select placeholder={t('expenseSource')} allowClear style={{ width: 170 }} options={chiqimSourceOptions}
             onChange={(val) => setFilters((prev) => ({ ...prev, source: val }))} />
           <RangePicker onChange={handleDateRange} />
         </Space>
         <Space>
           <Button icon={<TeamOutlined />} onClick={() => { setProfitData(null); setSelectedWagonIds([]); setPartnerCalcOpen(true); }}>
-            Sherik hisob
+            {t('partner')}
           </Button>
           <Button icon={<SettingOutlined />} onClick={() => setSourcesModalOpen(true)}>
-            Chiqim manbalari
+            {t('expenseSources')}
           </Button>
           <Button type="primary" style={{ background: '#389e0d' }} onClick={() => openModal('kirim')}>
-            + Kirim
+            {t('addIncome')}
           </Button>
           <Button type="primary" danger onClick={() => openModal('chiqim')}>
-            + Chiqim
+            {t('addExpense2')}
           </Button>
         </Space>
       </div>
@@ -342,18 +344,18 @@ export default function Cash() {
             <Col xs={24} sm={12} lg={8} xl={6} key={tx._id}>
               <Card className={`grid-card cash-card ${tx.type}`} size="small">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <Tag color={tx.type === 'kirim' ? 'green' : 'red'}>{tx.type === 'kirim' ? 'Kirim' : 'Chiqim'}</Tag>
+                  <Tag color={tx.type === 'kirim' ? 'green' : 'red'}>{tx.type === 'kirim' ? t('income') : t('expense')}</Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(tx.date)}</Text>
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: tx.type === 'chiqim' ? '#cf1322' : '#389e0d', marginBottom: 4 }}>
                   {tx.type === 'chiqim' ? '−' : '+'}{formatMoney(tx.amount, tx.currency)}
                 </div>
                 <div className="grid-card-row">
-                  <Text type="secondary" style={{ fontSize: 12 }}>Manba:</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>{t('source')}:</Text>
                   <Text style={{ fontSize: 12 }}>{getSourceName(tx)}</Text>
                 </div>
                 <div className="grid-card-row">
-                  <Text type="secondary" style={{ fontSize: 12 }}>Hisob:</Text>
+                  <Text type="secondary" style={{ fontSize: 12 }}>{t('account')}:</Text>
                   <Text style={{ fontSize: 12 }}>{accountOptions.find((a) => a.value === tx.account)?.label || tx.account}</Text>
                 </div>
                 {tx.description && <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }} ellipsis>{tx.description}</Text>}
@@ -367,7 +369,7 @@ export default function Cash() {
 
       {/* Create transaction modal */}
       <Modal
-        title={modalType === 'kirim' ? 'Kirim qo\'shish' : 'Chiqim qo\'shish'}
+        title={modalType === 'kirim' ? t('addIncomeTx') : t('addExpenseTx')}
         open={modalOpen}
         onCancel={() => { setModalOpen(false); setPartnerEnabled(false); form.resetFields(); }}
         onOk={() => form.submit()}
@@ -375,27 +377,27 @@ export default function Cash() {
       >
         <Form form={form} layout="vertical" onFinish={handleCreate}>
           {modalType === 'kirim' ? (
-            <Form.Item name="category" label="Kirim manbasi" rules={[{ required: true, message: 'Manbani tanlang' }]}>
-              <Select options={kirimSourceOptions} placeholder="Tanlang" />
+            <Form.Item name="category" label={t('incomeSource')} rules={[{ required: true, message: t('selectSource') }]}>
+              <Select options={kirimSourceOptions} placeholder={t('selectSource')} />
             </Form.Item>
           ) : (
-            <Form.Item name="source" label="Chiqim manbasi" rules={[{ required: true, message: 'Manbani tanlang' }]}>
-              <Select options={chiqimSourceOptions} placeholder="Tanlang" />
+            <Form.Item name="source" label={t('expenseSource')} rules={[{ required: true, message: t('selectSource') }]}>
+              <Select options={chiqimSourceOptions} placeholder={t('selectSource')} />
             </Form.Item>
           )}
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: 'Summani kiriting' }]}>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: t('enterAmount') }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
           </Form.Item>
-          <Form.Item name="currency" label="Valyuta" initialValue="USD">
+          <Form.Item name="currency" label={t('currency')} initialValue="USD">
             <Select options={currencyOptions} />
           </Form.Item>
-          <Form.Item name="account" label="Hisob" initialValue="USD_account">
+          <Form.Item name="account" label={t('account')} initialValue="USD_account">
             <Select options={accountOptions} />
           </Form.Item>
-          <Form.Item name="description" label="Izoh">
-            <Input.TextArea rows={3} placeholder="Izoh..." />
+          <Form.Item name="description" label={t('note')}>
+            <Input.TextArea rows={3} placeholder={t('note') + '...'} />
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
 
@@ -403,11 +405,11 @@ export default function Cash() {
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: partnerEnabled ? 8 : 0 }}>
                 <Switch checked={partnerEnabled} onChange={setPartnerEnabled} size="small" />
-                <span>Sherikka ulush berish (USD)</span>
+                <span>{t('partnerShare')}</span>
               </div>
               {partnerEnabled && (
-                <Form.Item name="partnerAmount" label="Sherik ulushi (USD)" style={{ marginTop: 8 }}
-                  rules={[{ required: partnerEnabled, message: 'Summani kiriting' }]}>
+                <Form.Item name="partnerAmount" label={t('partnerShareLabel')} style={{ marginTop: 8 }}
+                  rules={[{ required: partnerEnabled, message: t('enterAmount') }]}>
                   <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
                 </Form.Item>
               )}
@@ -418,39 +420,39 @@ export default function Cash() {
 
       {/* Chiqim sources management modal */}
       <Modal
-        title="Chiqim manbalari"
+        title={t('expenseSourcesTitle')}
         open={sourcesModalOpen}
         onCancel={() => { setSourcesModalOpen(false); setEditingSource(null); }}
         footer={null}
         width={500}
       >
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <Input placeholder="Yangi manba nomi" value={newSourceName}
+          <Input placeholder={t('newSourceName')} value={newSourceName}
             onChange={(e) => setNewSourceName(e.target.value)} onPressEnter={handleAddSource} />
           <Button type="primary" onClick={handleAddSource} loading={createSourceMutation.isPending}>
-            Qo'shish
+            {t('add')}
           </Button>
         </div>
 
         <List
           bordered
           dataSource={sources}
-          locale={{ emptyText: 'Manbalar yo\'q' }}
+          locale={{ emptyText: t('noSources') }}
           renderItem={(item) => (
             <List.Item
               actions={
                 item.isDefault
-                  ? [<Tag key="default" color="blue">Default</Tag>]
+                  ? [<Tag key="default" color="blue">{t('default')}</Tag>]
                   : editingSource === item._id
                     ? [
                       <Button size="small" type="primary" key="save" onClick={handleUpdateSource}
-                        loading={updateSourceMutation.isPending}>Saqlash</Button>,
-                      <Button size="small" key="cancel" onClick={() => setEditingSource(null)}>Bekor</Button>,
+                        loading={updateSourceMutation.isPending}>{t('save')}</Button>,
+                      <Button size="small" key="cancel" onClick={() => setEditingSource(null)}>{t('cancel')}</Button>,
                     ]
                     : [
                       <Button size="small" type="text" key="edit" icon={<EditOutlined />}
                         onClick={() => { setEditingSource(item._id); setEditingName(item.name); setEditingPercent(item.profitPercent || 0); }} />,
-                      <Popconfirm key="delete" title="O'chirishni tasdiqlaysizmi?"
+                      <Popconfirm key="delete" title={t('deleteConfirm')}
                         onConfirm={() => deleteSourceMutation.mutate(item._id)}>
                         <Button size="small" type="text" danger icon={<DeleteOutlined />} />
                       </Popconfirm>,
@@ -466,7 +468,7 @@ export default function Cash() {
                 <span>
                   {item.name}
                   {item.profitPercent > 0 && <Tag color="purple" style={{ marginLeft: 8 }}>{item.profitPercent}%</Tag>}
-                  {item.isDefault && <Tag color="blue" style={{ marginLeft: 4 }}>Default</Tag>}
+                  {item.isDefault && <Tag color="blue" style={{ marginLeft: 4 }}>{t('default')}</Tag>}
                 </span>
               )}
             </List.Item>
@@ -519,7 +521,7 @@ export default function Cash() {
                 const totalProfit = rows.reduce((s, r) => s + r.profitUSD, 0);
                 return (
                   <Table.Summary.Row>
-                    <Table.Summary.Cell index={0}><Text strong>Jami</Text></Table.Summary.Cell>
+                    <Table.Summary.Cell index={0}><Text strong>{t('total')}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={1}><Text strong>{formatMoney(rows.reduce((s, r) => s + r.totalCostUSD, 0), 'USD')}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={2}><Text strong style={{ color: '#52c41a' }}>{formatMoney(rows.reduce((s, r) => s + r.totalIncomeUSD, 0), 'USD')}</Text></Table.Summary.Cell>
                     <Table.Summary.Cell index={3}><Text strong style={{ color: totalProfit >= 0 ? '#389e0d' : '#ff4d4f' }}>{formatMoney(totalProfit, 'USD')}</Text></Table.Summary.Cell>

@@ -13,6 +13,7 @@ import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allB
 import DeliveriesTab from '../Deliveries';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
+import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
 
 const { RangePicker } = DatePicker;
@@ -60,6 +61,7 @@ function flattenExpenses(fixed, wood, custom) {
 
 // ===================== EXPENSES TABLE (shared) =====================
 function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd, rate = 0, totalM3 = 0 }) {
+  const { t } = useLanguage();
   const usdTotal = fixed.reduce((s, e) => s + (e.amount || 0), 0) + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
   const woodUsd = rate > 0 && wood.amount > 0 ? wood.amount / rate : null;
   const pricePerM3 = totalM3 > 0 && wood.amount > 0 ? wood.amount / totalM3 : (wood.pricePerM3 || 0);
@@ -79,7 +81,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
         <thead>
           <tr>
             <th style={thS}>Xarajat turi</th>
-            <th style={{ ...thS, width: 130, textAlign: 'right' }}>Narx/m³</th>
+            <th style={{ ...thS, width: 130, textAlign: 'right' }}>{t('pricePerM3')}</th>
             <th style={{ ...thS, width: 130, textAlign: 'right' }}>Jami summa</th>
           </tr>
         </thead>
@@ -134,7 +136,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
             </tr>
           ))}
           <tr style={{ background: '#f6ffed' }}>
-            <td style={{ ...cellS, fontWeight: 600 }}>Jami USD</td>
+            <td style={{ ...cellS, fontWeight: 600 }}>{t('totalUsd')}</td>
             <td />
             <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{usdTotal.toLocaleString('ru-RU')} USD</td>
           </tr>
@@ -142,7 +144,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
       </table>
 
       <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={onCustomAdd} style={{ marginBottom: 4 }}>
-        Qo'shimcha xarajat
+        {t('addExpense')}
       </Button>
     </>
   );
@@ -150,6 +152,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
 
 // ===================== CREATE MODAL =====================
 function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon', suppliers = [] }) {
+  const { t } = useLanguage();
   const isMashina = transportType === 'mashina';
   const [wagonCode, setWagonCode] = useState('');
   const [origin, setOrigin] = useState('');
@@ -173,7 +176,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
     if (!destination) errs.destination = true;
     if (Object.keys(errs).length) {
       setErrors(errs);
-      message.warning("Majburiy maydonlarni to'ldiring");
+      message.warning(t('mandatoryFields'));
       return;
     }
     onSave({
@@ -195,20 +198,20 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   };
 
   return (
-    <Modal title={isMashina ? 'Yangi mashina' : 'Yangi vagon'} open={open} onCancel={onCancel} onOk={handleOk}
+    <Modal title={isMashina ? t('newTruck') : t('newWagon')} open={open} onCancel={onCancel} onOk={handleOk}
       confirmLoading={loading} afterClose={handleAfterClose} width={700}
-      okText="Yaratish" cancelText="Bekor qilish">
+      okText={t('create')} cancelText={t('cancel')}>
 
       {/* Basic info */}
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <tbody>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ ...labelS, width: 160 }}>{isMashina ? 'Mashina raqami' : 'Vagon kodi'} <span style={{ color: '#ff4d4f' }}>*</span></td>
+            <td style={{ ...labelS, width: 160 }}>{isMashina ? t('truckCode') : t('wagonCode')} <span style={{ color: '#ff4d4f' }}>*</span></td>
             <td style={cellS}>
               {isMashina ? (
                 <Input size="small" value={wagonCode}
                   onChange={(e) => { const v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
-                  status={errors.wagonCode ? 'error' : undefined} placeholder="Mashina raqami" />
+                  status={errors.wagonCode ? 'error' : undefined} placeholder={t('truckCode')} />
               ) : (
                 <Input size="small" value={wagonCode}
                   onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 9); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
@@ -218,33 +221,33 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Jo'natilgan sana</td>
+            <td style={labelS}>{t('sentDate')}</td>
             <td style={cellS}>
               <DatePicker size="small" value={sentDate} style={{ width: '100%' }} onChange={setSentDate} />
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Kelgan sana</td>
+            <td style={labelS}>{t('arrivedDate')}</td>
             <td style={cellS}>
               <DatePicker size="small" value={arrivedDate} style={{ width: '100%' }} onChange={setArrivedDate} />
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Qayerdan <span style={{ color: '#ff4d4f' }}>*</span></td>
+            <td style={labelS}>{t('origin')} <span style={{ color: '#ff4d4f' }}>*</span></td>
             <td style={cellS}>
               <Input size="small" value={origin} status={errors.origin ? 'error' : undefined}
                 onChange={(e) => { setOrigin(e.target.value); setErrors((p) => ({ ...p, origin: false })); }} />
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Qayerga <span style={{ color: '#ff4d4f' }}>*</span></td>
+            <td style={labelS}>{t('destination')} <span style={{ color: '#ff4d4f' }}>*</span></td>
             <td style={cellS}>
               <Input size="small" value={destination} status={errors.destination ? 'error' : undefined}
                 onChange={(e) => { setDestination(e.target.value); setErrors((p) => ({ ...p, destination: false })); }} />
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Rus (yetkazib beruvchi)</td>
+            <td style={labelS}>{t('supplier')}</td>
             <td style={cellS}>
               <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
                 value={supplier} onChange={setSupplier}
@@ -285,11 +288,11 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       )}
       <Button size="small" type="dashed" icon={<PlusOutlined />} block
         onClick={() => setBundles((p) => [...p, { thickness: null, width: null, length: null, count: null }])}>
-        Yog'och qo'shish
+        {t('addWood')}
       </Button>
 
       {/* Expenses */}
-      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('expenses')}</Divider>
       <ExpensesEditor
         fixed={fixed} wood={wood} custom={custom} rate={globalRate}
         onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
@@ -319,15 +322,15 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
         const tannarx = totalM3 > 0 ? totalUsd / totalM3 : 0;
         return (
           <>
-            <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Tannarx (avtomatik)</Divider>
+            <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('costPreview')}</Divider>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <tbody>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>Jami USD xarajatlar</td>
+                  <td style={labelS}>{t('totalUsdExpenses')}</td>
                   <td style={{ ...cellS, textAlign: 'right' }}>{usdTotal.toLocaleString('ru-RU')} USD</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
-                  <td style={labelS}>Yog'och xaridi (RUB → USD)</td>
+                  <td style={labelS}>{t('woodPurchase')} → USD</td>
                   <td style={{ ...cellS, textAlign: 'right' }}>
                     {rubTotal.toLocaleString('ru-RU')} RUB
                     {rate > 0 ? ` ÷ ${rate} = ${rubInUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : ''}
@@ -335,15 +338,15 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
                   </td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>Jami xarajat (USD)</td>
+                  <td style={labelS}>{t('totalCost')}</td>
                   <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{totalUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>Jami m³</td>
+                  <td style={labelS}>{t('totalM3')}</td>
                   <td style={{ ...cellS, textAlign: 'right' }}>{totalM3.toFixed(4)} m³</td>
                 </tr>
                 <tr style={{ background: '#f6ffed' }}>
-                  <td style={{ ...labelS, fontWeight: 700 }}>Tannarx / m³</td>
+                  <td style={{ ...labelS, fontWeight: 700 }}>{t('costPerM3')}</td>
                   <td style={{ ...cellS, textAlign: 'right', fontWeight: 700, fontSize: 16, color: '#1677ff' }}>
                     {tannarx > 0 ? `${tannarx.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : '—'}
                   </td>
@@ -359,6 +362,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
 
 // ===================== DETAIL MODAL =====================
 function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, deleting, globalRate, onWarehouse, warehouseLoading, suppliers = [] }) {
+  const { t } = useLanguage();
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [fixed, setFixed] = useState([]);
@@ -430,28 +434,28 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
   return (
     <Modal title={`${wagon.type === 'mashina' ? 'Mashina' : 'Vagon'}: ${wagon.wagonCode}`} open={open} onCancel={() => { setEditMode(false); onClose(); }} width={800}
       footer={editMode ? [
-        <Button key="cancel" onClick={() => setEditMode(false)}>Bekor qilish</Button>,
-        <Button key="save" type="primary" loading={updating} onClick={handleSave}>Saqlash</Button>,
+        <Button key="cancel" onClick={() => setEditMode(false)}>{t('cancel')}</Button>,
+        <Button key="save" type="primary" loading={updating} onClick={handleSave}>{t('save')}</Button>,
       ] : [
-        <Popconfirm key="del" title="O'chirishni tasdiqlaysizmi?" onConfirm={() => onDelete(wagon._id)}>
-          <Button danger loading={deleting}>O'chirish</Button>
+        <Popconfirm key="del" title={t('deleteConfirm')} onConfirm={() => onDelete(wagon._id)}>
+          <Button danger loading={deleting}>{t('delete')}</Button>
         </Popconfirm>,
-        <Button key="edit" type="primary" onClick={openEdit}>Tahrirlash</Button>,
+        <Button key="edit" type="primary" onClick={openEdit}>{t('edit')}</Button>,
       ]}>
 
       {!editMode ? (
         <>
           {/* View mode */}
           <Descriptions bordered column={2} size="small" style={{ marginBottom: 16 }}>
-            <Descriptions.Item label={wagon.type === 'mashina' ? 'Mashina raqami' : 'Vagon kodi'}>{wagon.wagonCode}</Descriptions.Item>
-            <Descriptions.Item label="Status"><Tag color={statusColors[wagon.status]}>{statusLabels[wagon.status]}</Tag></Descriptions.Item>
-            <Descriptions.Item label="Jo'natilgan sana">{formatDate(wagon.sentDate)}</Descriptions.Item>
-            <Descriptions.Item label="Kelgan sana">{formatDate(wagon.arrivedDate)}</Descriptions.Item>
-            <Descriptions.Item label="Qayerdan">{wagon.origin || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Qayerga">{wagon.destination || '-'}</Descriptions.Item>
+            <Descriptions.Item label={wagon.type === 'mashina' ? t('truckCode') : t('wagonCode')}>{wagon.wagonCode}</Descriptions.Item>
+            <Descriptions.Item label={t('status')}><Tag color={statusColors[wagon.status]}>{statusLabels[wagon.status]}</Tag></Descriptions.Item>
+            <Descriptions.Item label={t('sentDate')}>{formatDate(wagon.sentDate)}</Descriptions.Item>
+            <Descriptions.Item label={t('arrivedDate')}>{formatDate(wagon.arrivedDate)}</Descriptions.Item>
+            <Descriptions.Item label={t('origin')}>{wagon.origin || '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('destination')}>{wagon.destination || '-'}</Descriptions.Item>
             <Descriptions.Item label="Kurs (RUB/USD)">{rate || '-'}</Descriptions.Item>
-            <Descriptions.Item label="Jami m³">{formatM3(totalM3)}</Descriptions.Item>
-            <Descriptions.Item label="Rus (yetkazib beruvchi)" span={2}>
+            <Descriptions.Item label={t('totalM3')}>{formatM3(totalM3)}</Descriptions.Item>
+            <Descriptions.Item label={t('supplier')} span={2}>
               {wagon.supplier?.name || '—'}
             </Descriptions.Item>
           </Descriptions>
@@ -485,7 +489,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             </tbody>
           </table>
           {(wagon.woodBundles || []).some(b => b.location === 'vagon') && (
-            <Popconfirm title="Barcha yog'ochlarni omborga o'tkazishni tasdiqlaysizmi?" onConfirm={() => onWarehouse(wagon._id)}>
+            <Popconfirm title={t('allToWarehouseConfirm')} onConfirm={() => onWarehouse(wagon._id)}>
               <Button type="primary" icon={<InboxOutlined />} loading={warehouseLoading} style={{ marginTop: 8 }}>
                 Barchasini omborga o'tkazish
               </Button>
@@ -493,7 +497,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           )}
 
           {/* Expenses view */}
-          <Divider titlePlacement="left" style={{ margin: '8px 0' }}>Xarajatlar</Divider>
+          <Divider titlePlacement="left" style={{ margin: '8px 0' }}>{t('expenses')}</Divider>
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
             <thead>
               <tr><th style={thS}>Turi</th><th style={{ ...thS, textAlign: 'right', width: 130 }}>Summa</th><th style={{ ...thS, width: 70 }}>Valyuta</th></tr>
@@ -516,10 +520,10 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             <Descriptions.Item label="USD xarajatlar">{formatMoney(usdExp)}</Descriptions.Item>
             <Descriptions.Item label="RUB xarajatlar">{rubExp.toLocaleString('ru-RU')} RUB</Descriptions.Item>
             <Descriptions.Item label="Kurs">{rate > 0 ? `1 USD = ${rate} RUB` : <Text type="danger">Belgilanmagan</Text>}</Descriptions.Item>
-            <Descriptions.Item label="RUB → USD">{rate > 0 ? formatMoney(rubInUsd) : '-'}</Descriptions.Item>
-            <Descriptions.Item label="Jami xarajat (USD)"><Text strong>{formatMoney(totalExpUsd)}</Text></Descriptions.Item>
-            <Descriptions.Item label="Jami m³"><Text strong>{formatM3(totalM3)}</Text></Descriptions.Item>
-            <Descriptions.Item label="Tannarx / m³">
+            <Descriptions.Item label={t('rubInUsd')}>{rate > 0 ? formatMoney(rubInUsd) : '-'}</Descriptions.Item>
+            <Descriptions.Item label={t('totalCost')}><Text strong>{formatMoney(totalExpUsd)}</Text></Descriptions.Item>
+            <Descriptions.Item label={t('totalM3')}><Text strong>{formatM3(totalM3)}</Text></Descriptions.Item>
+            <Descriptions.Item label={t('costPerM3')}>
               <Text strong style={{ color: '#1677ff', fontSize: 16 }}>
                 {wagon.costPricePerM3 > 0 ? formatMoney(wagon.costPricePerM3) : '-'}
               </Text>
@@ -532,21 +536,21 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
             <tbody>
               {[
-                [wagon.type === 'mashina' ? 'Mashina raqami' : 'Vagon kodi',
+                [wagon.type === 'mashina' ? t('truckCode') : t('wagonCode'),
                   wagon.type === 'mashina'
                     ? <Input size="small" value={formData.wagonCode}
                         onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase() }))} />
                     : <Input size="small" value={formData.wagonCode} maxLength={9}
                         onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/\D/g, '').slice(0, 9) }))} />],
-                ["Jo'natilgan sana", <DatePicker size="small" style={{ width: '100%' }} value={formData.sentDate ? dayjs(formData.sentDate) : null}
+                [t('sentDate'), <DatePicker size="small" style={{ width: '100%' }} value={formData.sentDate ? dayjs(formData.sentDate) : null}
                   onChange={(d) => setFormData((p) => ({ ...p, sentDate: d?.toISOString() || null }))} />],
-                ['Kelgan sana', <DatePicker size="small" style={{ width: '100%' }} value={formData.arrivedDate ? dayjs(formData.arrivedDate) : null}
+                [t('arrivedDate'), <DatePicker size="small" style={{ width: '100%' }} value={formData.arrivedDate ? dayjs(formData.arrivedDate) : null}
                   onChange={(d) => setFormData((p) => ({ ...p, arrivedDate: d?.toISOString() || null }))} />],
-                ['Qayerdan', <Input size="small" value={formData.origin} onChange={(e) => setFormData((p) => ({ ...p, origin: e.target.value }))} />],
-                ['Qayerga', <Input size="small" value={formData.destination} onChange={(e) => setFormData((p) => ({ ...p, destination: e.target.value }))} />],
+                [t('origin'), <Input size="small" value={formData.origin} onChange={(e) => setFormData((p) => ({ ...p, origin: e.target.value }))} />],
+                [t('destination'), <Input size="small" value={formData.destination} onChange={(e) => setFormData((p) => ({ ...p, destination: e.target.value }))} />],
                 ['Kurs (RUB/USD)', <InputNumber size="small" style={{ width: '100%' }} min={0} step={0.01} value={formData.exchangeRate}
                   onChange={(v) => setFormData((p) => ({ ...p, exchangeRate: v || 0 }))} placeholder="Masalan: 90" />],
-                ['Rus (yetkazib beruvchi)', <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
+                [t('supplier'), <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
                   value={formData.supplier || null}
                   onChange={(v) => setFormData((p) => ({ ...p, supplier: v || null }))}
                   options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />],
@@ -593,11 +597,11 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           )}
           <Button size="small" type="dashed" icon={<PlusOutlined />} block
             onClick={() => setBundles((p) => [...p, { thickness: null, width: null, length: null, count: null, deductions: [] }])}>
-            Yog'och qo'shish
+            {t('addWood')}
           </Button>
 
           {/* Edit expenses */}
-          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar</Divider>
+          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('expenses')}</Divider>
           <ExpensesEditor
             fixed={fixed} wood={wood} custom={custom} rate={globalRate}
             onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
@@ -626,15 +630,15 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             const editTannarx = editM3 > 0 ? editTotalUsd / editM3 : 0;
             return (
               <>
-                <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Tannarx (avtomatik)</Divider>
+                <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('costPreview')}</Divider>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <tbody>
                     <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>Jami USD xarajatlar</td>
+                      <td style={labelS}>{t('totalUsdExpenses')}</td>
                       <td style={{ ...cellS, textAlign: 'right' }}>{editUsd.toLocaleString('ru-RU')} USD</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
-                      <td style={labelS}>RUB xarajatlar → USD</td>
+                      <td style={labelS}>{t('rubInUsd')}</td>
                       <td style={{ ...cellS, textAlign: 'right' }}>
                         {editRub.toLocaleString('ru-RU')} RUB
                         {editRate > 0 ? ` ÷ ${editRate} = ${editRubInUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : ''}
@@ -642,15 +646,15 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
                       </td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>Jami xarajat (USD)</td>
+                      <td style={labelS}>{t('totalCost')}</td>
                       <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{editTotalUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD</td>
                     </tr>
                     <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>Jami m³</td>
+                      <td style={labelS}>{t('totalM3')}</td>
                       <td style={{ ...cellS, textAlign: 'right' }}>{editM3.toFixed(4)} m³</td>
                     </tr>
                     <tr style={{ background: '#f6ffed' }}>
-                      <td style={{ ...labelS, fontWeight: 700 }}>Tannarx / m³</td>
+                      <td style={{ ...labelS, fontWeight: 700 }}>{t('costPerM3')}</td>
                       <td style={{ ...cellS, textAlign: 'right', fontWeight: 700, fontSize: 16, color: '#1677ff' }}>
                         {editTannarx > 0 ? `${editTannarx.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : '—'}
                       </td>
@@ -665,12 +669,12 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
       )}
 
       {/* Deduction modal — outside of edit/view conditional */}
-      <Modal title="Yog'och ayirish" open={deductOpen}
+      <Modal title={t('deductWood')} open={deductOpen}
         onCancel={() => { setDeductOpen(false); setDeductReason(''); setDeductCount(null); }}
-        onOk={submitDeduction} okText="Ayirish" cancelText="Bekor qilish" width={400}
+        onOk={submitDeduction} okText="Ayirish" cancelText={t('cancel')} width={400}
         zIndex={1100}>
         <Space orientation="vertical" style={{ width: '100%' }}>
-          <Input placeholder="Sababi (masalan: sifatsiz)" value={deductReason} onChange={(e) => setDeductReason(e.target.value)} />
+          <Input placeholder={t('deductReason')} value={deductReason} onChange={(e) => setDeductReason(e.target.value)} />
           <InputNumber placeholder="Nechta" min={1} style={{ width: '100%' }} value={deductCount} onChange={setDeductCount} />
         </Space>
       </Modal>
@@ -680,6 +684,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
 
 // ===================== WAGON CARD (grid view) =====================
 function WagonCard({ wagon, onClick, isArchive, onSell }) {
+  const { t } = useLanguage();
   const totalM3 = (wagon.woodBundles || []).reduce((s, b) => s + (b.totalM3 || 0), 0);
   const bundleCount = (wagon.woodBundles || []).length;
   const status = isArchive ? 'sotildi' : wagon.status;
@@ -729,7 +734,7 @@ function WagonCard({ wagon, onClick, isArchive, onSell }) {
         <div className="wagon-card-sell">
           <Button type="primary" icon={<ShoppingCartOutlined />} block
             onClick={(e) => { e.stopPropagation(); onSell(wagon); }}>
-            Sotish
+            {t('sell')}
           </Button>
         </div>
       )}
@@ -739,6 +744,7 @@ function WagonCard({ wagon, onClick, isArchive, onSell }) {
 
 // ===================== BUNDLE SELL MODAL =====================
 function BundleSellModal({ wagon, open, onClose }) {
+  const { t } = useLanguage();
   const { addItem } = useCart();
   const [quantities, setQuantities] = useState({});
 
@@ -768,8 +774,8 @@ function BundleSellModal({ wagon, open, onClose }) {
   };
 
   return (
-    <Modal title={`Sotish — ${wagon?.type === 'mashina' ? 'Mashina' : 'Vagon'} ${wagon?.wagonCode || ''}`} open={open} onCancel={handleClose}
-      footer={<Button onClick={handleClose}>Yopish</Button>} width={600}>
+    <Modal title={`${t('sell')} — ${wagon?.type === 'mashina' ? 'Mashina' : 'Vagon'} ${wagon?.wagonCode || ''}`} open={open} onCancel={handleClose}
+      footer={<Button onClick={handleClose}>{t('close')}</Button>} width={600}>
       {bundles.length === 0 ? (
         <Text type="secondary">Qoldiq yog'och yo'q</Text>
       ) : (
@@ -798,7 +804,7 @@ function BundleSellModal({ wagon, open, onClose }) {
                   <td style={cellS}>
                     <Button size="small" type="primary" icon={<ShoppingCartOutlined />}
                       onClick={() => handleAdd(b, idx)}>
-                      Qo'shish
+                      {t('add')}
                     </Button>
                   </td>
                 </tr>
@@ -813,6 +819,7 @@ function BundleSellModal({ wagon, open, onClose }) {
 
 // ===================== MAIN PAGE =====================
 export default function Wagons() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ status: undefined, startDate: undefined, endDate: undefined });
   const [createOpen, setCreateOpen] = useState(false);
@@ -827,24 +834,24 @@ export default function Wagons() {
 
   const createMutation = useMutation({
     mutationFn: createWagon,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setCreateOpen(false); message.success(createType === 'mashina' ? 'Mashina yaratildi' : 'Vagon yaratildi'); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setCreateOpen(false); message.success(createType === 'mashina' ? t('truckCreated') : t('wagonCreated')); },
     onError: () => message.error('Yaratishda xatolik'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateWagon(id, data),
-    onSuccess: (updated) => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(updated); message.success('Yangilandi'); },
+    onSuccess: (updated) => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(updated); message.success(t('updated')); },
     onError: () => message.error('Saqlashda xatolik'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteWagon,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(null); message.success("O'chirildi"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(null); message.success(t('deleted')); },
   });
 
   const warehouseMutation = useMutation({
     mutationFn: allBundlesToWarehouse,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(null); message.success("Omborga o'tkazildi"); },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setSelectedWagon(null); message.success(t('warehouseDone')); },
     onError: () => message.error('Xatolik yuz berdi'),
   });
 
@@ -913,8 +920,8 @@ export default function Wagons() {
             ]} />
         </Space>
         <Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCreateType('vagon'); setCreateOpen(true); }}>Yangi vagon</Button>
-          <Button icon={<CarOutlined />} onClick={() => { setCreateType('mashina'); setCreateOpen(true); }}>Yangi mashina</Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => { setCreateType('vagon'); setCreateOpen(true); }}>{t('newWagon')}</Button>
+          <Button icon={<CarOutlined />} onClick={() => { setCreateType('mashina'); setCreateOpen(true); }}>{t('newTruck')}</Button>
         </Space>
       </div>
 
@@ -933,7 +940,7 @@ export default function Wagons() {
             <span className="summary-stat-value highlight">{activeWagons.filter(w => w.status === 'faol').length}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Arxiv</span>
+            <span className="summary-stat-label">{t('archive')}</span>
             <span className="summary-stat-value">{archivedWagons.length}</span>
           </div>
           <div className="summary-stat">
@@ -951,12 +958,12 @@ export default function Wagons() {
         },
         {
           key: 'archive',
-          label: `Arxiv (${archivedWagons.length})`,
+          label: `${t('archive')} (${archivedWagons.length})`,
           children: renderList(archivedWagons, archiveColumns, true),
         },
         {
           key: 'deliveries',
-          label: 'Yetkazmalar',
+          label: t('deliveriesTab'),
           children: <DeliveriesTab />,
         },
       ]} />

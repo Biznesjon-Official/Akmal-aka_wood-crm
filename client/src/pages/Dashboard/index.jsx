@@ -1,36 +1,15 @@
-import { Card, Row, Col, Statistic, Table, Tag, Spin, Progress, Typography, Space } from 'antd';
+import { Card, Row, Col, Spin, Progress, Typography, Space } from 'antd';
 import {
-  DollarOutlined, WarningOutlined, WalletOutlined,
-  CarOutlined, CheckCircleOutlined, ShopOutlined,
-  ArrowUpOutlined, ArrowDownOutlined, SendOutlined,
+  WarningOutlined, WalletOutlined,
+  CarOutlined, ArrowUpOutlined, ArrowDownOutlined, SendOutlined,
 } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
 import { getDashboardStats } from '../../api';
 import { formatMoney, formatDate, statusLabels, statusColors } from '../../utils/format';
+import { Table, Tag } from 'antd';
+import { useLanguage } from '../../context/LanguageContext';
 
-const { Text, Title } = Typography;
-
-const salesColumns = [
-  { title: 'Mijoz', dataIndex: ['customer', 'name'], key: 'customer' },
-  { title: 'Sana', dataIndex: 'createdAt', key: 'date', render: (v) => formatDate(v) },
-  { title: 'Summa', dataIndex: 'totalAmount', key: 'totalAmount', render: (v, r) => formatMoney(v, r.currency) },
-  {
-    title: 'Qarz', key: 'debt',
-    render: (_, r) => {
-      const debt = Math.max(0, (r.totalAmount || 0) - (r.paidAmount || 0));
-      return debt > 0
-        ? <Text type="danger">{formatMoney(debt, r.currency)}</Text>
-        : <Text type="success">To'liq</Text>;
-    },
-  },
-];
-
-const wagonColumns = [
-  { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode', render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v}</Text> },
-  { title: 'Kelib chiqishi', dataIndex: 'origin', key: 'origin' },
-  { title: 'Sana', dataIndex: 'sentDate', key: 'sentDate', render: (v) => formatDate(v) },
-  { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => <Tag color={statusColors[v]}>{statusLabels[v] || v}</Tag> },
-];
+const { Text } = Typography;
 
 function KpiCard({ title, value, color, prefix, suffix, extra }) {
   return (
@@ -47,6 +26,30 @@ function KpiCard({ title, value, color, prefix, suffix, extra }) {
 }
 
 export default function Dashboard() {
+  const { t } = useLanguage();
+
+  const salesColumns = [
+    { title: t('customer'), dataIndex: ['customer', 'name'], key: 'customer' },
+    { title: t('date'), dataIndex: 'createdAt', key: 'date', render: (v) => formatDate(v) },
+    { title: t('amount'), dataIndex: 'totalAmount', key: 'totalAmount', render: (v, r) => formatMoney(v, r.currency) },
+    {
+      title: t('debt'), key: 'debt',
+      render: (_, r) => {
+        const debt = Math.max(0, (r.totalAmount || 0) - (r.paidAmount || 0));
+        return debt > 0
+          ? <Text type="danger">{formatMoney(debt, r.currency)}</Text>
+          : <Text type="success">{t('full')}</Text>;
+      },
+    },
+  ];
+
+  const wagonColumns = [
+    { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode', render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v}</Text> },
+    { title: t('fromWhere'), dataIndex: 'origin', key: 'origin' },
+    { title: t('date'), dataIndex: 'sentDate', key: 'sentDate', render: (v) => formatDate(v) },
+    { title: t('status'), dataIndex: 'status', key: 'status', render: (v) => <Tag color={statusColors[v]}>{statusLabels[v] || v}</Tag> },
+  ];
+
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: getDashboardStats,
@@ -57,7 +60,7 @@ export default function Dashboard() {
   }
 
   if (!data) {
-    return <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>Ma'lumotlar yuklanmadi</div>;
+    return <div style={{ textAlign: 'center', padding: 80, color: '#999' }}>{t('loading')}</div>;
   }
 
   const {
@@ -80,7 +83,7 @@ export default function Dashboard() {
       <Row gutter={[12, 12]}>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Kassa (USD)"
+            title={t('cashUsd')}
             value={formatMoney(balance.USD, 'USD')}
             color={balance.USD >= 0 ? '#389e0d' : '#cf1322'}
             prefix={<WalletOutlined />}
@@ -88,7 +91,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Kassa (RUB)"
+            title={t('cashRub')}
             value={formatMoney(balance.RUB, 'RUB')}
             color={balance.RUB >= 0 ? '#1677ff' : '#cf1322'}
             prefix={<WalletOutlined />}
@@ -96,7 +99,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Bu oy savdo"
+            title={t('monthSales')}
             value={formatMoney(thisMonth.USD, 'USD')}
             color="#722ed1"
             prefix={<ArrowUpOutlined />}
@@ -105,7 +108,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Jami qarz"
+            title={t('totalDebt')}
             value={formatMoney(totalDebt.USD, 'USD')}
             color={totalDebt.USD > 0 ? '#cf1322' : '#52c41a'}
             prefix={<WarningOutlined />}
@@ -114,7 +117,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Faol vagonlar"
+            title={t('activeWagons')}
             value={`${activeTotal} ta`}
             color="#1677ff"
             prefix={<CarOutlined />}
@@ -123,7 +126,7 @@ export default function Dashboard() {
         </Col>
         <Col xs={12} sm={8} md={6} lg={4}>
           <KpiCard
-            title="Yetkazma qoldig'i"
+            title={t('deliveryRemaining')}
             value={formatMoney(deliveryStats.remaining, 'USD')}
             color={deliveryStats.remaining > 0 ? '#d46b08' : '#52c41a'}
             prefix={<SendOutlined />}
@@ -135,13 +138,13 @@ export default function Dashboard() {
       {/* Second row: Wagon pipeline + Delivery + Month cash */}
       <Row gutter={[12, 12]}>
         <Col xs={24} md={8}>
-          <Card title="Vagonlar holati" size="small">
+          <Card title={t('wagonStatus')} size="small">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'Kelyapti', count: comingCount, color: '#faad14' },
-                { label: 'Faol', count: activeCount, color: '#1677ff' },
-                { label: 'Omborda', count: warehouseCount, color: '#722ed1' },
-                { label: 'Sotildi', count: soldCount, color: '#52c41a' },
+                { label: t('coming'), count: comingCount, color: '#faad14' },
+                { label: t('active'), count: activeCount, color: '#1677ff' },
+                { label: t('inWarehouse'), count: warehouseCount, color: '#722ed1' },
+                { label: t('sold'), count: soldCount, color: '#52c41a' },
               ].map(({ label, count, color }) => (
                 <div key={label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, fontSize: 13 }}>
@@ -161,26 +164,26 @@ export default function Dashboard() {
         </Col>
 
         <Col xs={24} md={8}>
-          <Card title="Yetkazmalar" size="small">
+          <Card title={t('deliveries_stat')} size="small">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Jami yetkazma:</Text>
+                <Text type="secondary">{t('totalDeliveries')}</Text>
                 <Text strong>{deliveryStats.total || 0} ta</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Aktiv:</Text>
+                <Text type="secondary">{t('activeDeliveries')}</Text>
                 <Text strong style={{ color: '#1677ff' }}>{deliveryStats.active || 0} ta</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Jami qarz:</Text>
+                <Text type="secondary">{t('totalDebt2')}</Text>
                 <Text strong>{formatMoney(deliveryStats.totalDebt, 'USD')}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">To'langan:</Text>
+                <Text type="secondary">{t('paid2')}</Text>
                 <Text strong style={{ color: '#52c41a' }}>{formatMoney(deliveryStats.paidAmount, 'USD')}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Qoldiq:</Text>
+                <Text type="secondary">{t('remaining2')}</Text>
                 <Text strong style={{ color: '#cf1322' }}>{formatMoney(deliveryStats.remaining, 'USD')}</Text>
               </div>
               {deliveryStats.totalDebt > 0 && (
@@ -195,24 +198,24 @@ export default function Dashboard() {
         </Col>
 
         <Col xs={24} md={8}>
-          <Card title="Bu oy kassa" size="small">
+          <Card title={t('monthCash')} size="small">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space>
                   <ArrowUpOutlined style={{ color: '#52c41a' }} />
-                  <Text type="secondary">Kirim (USD):</Text>
+                  <Text type="secondary">{t('incomeUsd')}</Text>
                 </Space>
                 <Text strong style={{ color: '#52c41a' }}>{formatMoney(monthCash.kirimUSD, 'USD')}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Space>
                   <ArrowDownOutlined style={{ color: '#cf1322' }} />
-                  <Text type="secondary">Chiqim (USD):</Text>
+                  <Text type="secondary">{t('expenseUsd')}</Text>
                 </Space>
                 <Text strong style={{ color: '#cf1322' }}>{formatMoney(monthCash.chiqimUSD, 'USD')}</Text>
               </div>
               <div style={{ padding: '8px 0', borderTop: '1px solid #f0f0f0', display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Sof (USD):</Text>
+                <Text type="secondary">{t('netUsd')}</Text>
                 <Text strong style={{ color: (monthCash.kirimUSD - monthCash.chiqimUSD) >= 0 ? '#389e0d' : '#cf1322', fontSize: 15 }}>
                   {formatMoney(monthCash.kirimUSD - monthCash.chiqimUSD, 'USD')}
                 </Text>
@@ -220,11 +223,11 @@ export default function Dashboard() {
               {(monthCash.kirimRUB > 0 || monthCash.chiqimRUB > 0) && (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Space><ArrowUpOutlined style={{ color: '#52c41a' }} /><Text type="secondary">Kirim (RUB):</Text></Space>
+                    <Space><ArrowUpOutlined style={{ color: '#52c41a' }} /><Text type="secondary">{t('incomeRub')}</Text></Space>
                     <Text strong style={{ color: '#52c41a' }}>{formatMoney(monthCash.kirimRUB, 'RUB')}</Text>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Space><ArrowDownOutlined style={{ color: '#cf1322' }} /><Text type="secondary">Chiqim (RUB):</Text></Space>
+                    <Space><ArrowDownOutlined style={{ color: '#cf1322' }} /><Text type="secondary">{t('expenseRub')}</Text></Space>
                     <Text strong style={{ color: '#cf1322' }}>{formatMoney(monthCash.chiqimRUB, 'RUB')}</Text>
                   </div>
                 </>
@@ -237,7 +240,7 @@ export default function Dashboard() {
       {/* Recent tables */}
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={12}>
-          <Card title="Oxirgi sotuvlar" size="small">
+          <Card title={t('recentSales')} size="small">
             <Table
               columns={salesColumns}
               dataSource={recentSales}
@@ -248,7 +251,7 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col xs={24} lg={12}>
-          <Card title="Kelayotgan vagonlar" size="small">
+          <Card title={t('comingWagons')} size="small">
             <Table
               columns={wagonColumns}
               dataSource={incomingWagons}

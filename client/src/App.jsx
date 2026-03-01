@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConfigProvider } from 'antd';
 import { CartProvider } from './context/CartContext';
+import { LanguageProvider } from './context/LanguageContext';
 import AppLayout from './components/AppLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import PinLock from './components/PinLock';
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
       <CartProvider>
         <ConfigProvider theme={theme}>
           <BrowserRouter>
@@ -72,6 +74,7 @@ export default function App() {
           </BrowserRouter>
         </ConfigProvider>
       </CartProvider>
+      </LanguageProvider>
     </QueryClientProvider>
     </ErrorBoundary>
   );

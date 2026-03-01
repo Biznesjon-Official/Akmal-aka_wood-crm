@@ -13,16 +13,17 @@ import {
   markDelivered, addDeliveryPayment, getCustomers, createCustomer,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
+import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
 
 const { Text, Title } = Typography;
 
 const STATUS_COLOR = { "yo'lda": 'orange', yetkazildi: 'blue', yakunlandi: 'green' };
-const STATUS_LABEL = { "yo'lda": "Yo'lda", yetkazildi: 'Yetkazildi', yakunlandi: 'Yakunlandi' };
 const DEBT_COLOR = { tolanmagan: '#ff4d4f', qisman: '#fa8c16', toliq: '#52c41a' };
 const DEBT_LABEL = { tolanmagan: "To'lanmagan", qisman: 'Qisman', toliq: "To'liq" };
 
 export default function Deliveries() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [modalOpen, setModalOpen] = useState(false);
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -34,6 +35,12 @@ export default function Deliveries() {
   const [statusFilter, setStatusFilter] = useState('');
   const [customerTyped, setCustomerTyped] = useState('');
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+
+  const STATUS_LABEL = {
+    "yo'lda": t('onRoad'),
+    yetkazildi: t('delivered'),
+    yakunlandi: t('finished'),
+  };
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['deliveries'] });
@@ -57,30 +64,30 @@ export default function Deliveries() {
 
   const createMut = useMutation({
     mutationFn: createDelivery,
-    onSuccess: () => { invalidate(); message.success('Yaratildi'); closeModal(); },
-    onError: () => message.error('Xatolik'),
+    onSuccess: () => { invalidate(); message.success(t('updated')); closeModal(); },
+    onError: () => message.error(t('error')),
   });
 
   const updateMut = useMutation({
     mutationFn: ({ id, data }) => updateDelivery(id, data),
-    onSuccess: () => { invalidate(); message.success('Saqlandi'); closeModal(); },
-    onError: () => message.error('Xatolik'),
+    onSuccess: () => { invalidate(); message.success(t('updated')); closeModal(); },
+    onError: () => message.error(t('error')),
   });
 
   const deleteMut = useMutation({
     mutationFn: deleteDelivery,
-    onSuccess: () => { invalidate(); message.success("O'chirildi"); },
+    onSuccess: () => { invalidate(); message.success(t('deleted')); },
   });
 
   const deliverMut = useMutation({
     mutationFn: markDelivered,
-    onSuccess: () => { invalidate(); message.success('Yetkazildi'); },
+    onSuccess: () => { invalidate(); message.success(t('delivered')); },
   });
 
   const payMut = useMutation({
     mutationFn: ({ id, data }) => addDeliveryPayment(id, data),
-    onSuccess: () => { invalidate(); message.success("To'lov qo'shildi"); setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); },
-    onError: () => message.error('Xatolik'),
+    onSuccess: () => { invalidate(); message.success(t('paymentAdded2')); setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); },
+    onError: () => message.error(t('error')),
   });
 
   const closeModal = () => {
@@ -147,7 +154,7 @@ export default function Deliveries() {
 
       if (editing) updateMut.mutate({ id: editing._id, data });
       else createMut.mutate(data);
-    } catch { message.error('Xatolik'); }
+    } catch { message.error(t('error')); }
   };
 
   // Summary stats
@@ -157,15 +164,15 @@ export default function Deliveries() {
 
   const columns = [
     {
-      title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode',
+      title: t('wagonNumber'), dataIndex: 'wagonCode', key: 'wagonCode',
       render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v || '—'}</Text>,
     },
     {
-      title: 'Mijoz', key: 'customer',
+      title: t('customer'), key: 'customer',
       render: (_, r) => <Text>{r.customer?.name || '—'}</Text>,
     },
     {
-      title: 'Sanalar', key: 'dates',
+      title: t('date'), key: 'dates',
       render: (_, r) => (
         <div style={{ fontSize: 12 }}>
           <div>{formatDate(r.sentDate)}</div>
@@ -174,7 +181,7 @@ export default function Deliveries() {
       ),
     },
     {
-      title: 'Yuk', key: 'cargo',
+      title: t('cargo'), key: 'cargo',
       render: (_, r) => r.cargoType ? (
         <div style={{ fontSize: 12 }}>
           <div>{r.cargoType}</div>
@@ -183,15 +190,15 @@ export default function Deliveries() {
       ) : '—',
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status',
+      title: t('status'), dataIndex: 'status', key: 'status',
       render: (v) => <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>,
     },
     {
-      title: 'Jami qarz', key: 'totalDebt',
+      title: t('totalDebt3'), key: 'totalDebt',
       render: (_, r) => <Text strong>{formatMoney(r.totalDebt, 'USD')}</Text>,
     },
     {
-      title: 'To\'lov holati', key: 'debt',
+      title: t('paid'), key: 'debt',
       render: (_, r) => {
         const pct = r.totalDebt > 0 ? Math.min(100, Math.round((r.paidAmount / r.totalDebt) * 100)) : 0;
         return (
@@ -221,12 +228,12 @@ export default function Deliveries() {
             <Button size="small" type="text" style={{ color: '#1677ff' }} icon={<DollarOutlined />} onClick={() => openPay(r)} />
           )}
           {r.status === "yo'lda" && (
-            <Popconfirm title="Yetkazildi deb belgilaymi?" onConfirm={() => deliverMut.mutate(r._id)}>
+            <Popconfirm title={t('deliveryConfirm')} onConfirm={() => deliverMut.mutate(r._id)}>
               <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
             </Popconfirm>
           )}
           <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(r)} />
-          <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteMut.mutate(r._id)}>
+          <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMut.mutate(r._id)}>
             <Button size="small" type="text" danger icon={<DeleteOutlined />} />
           </Popconfirm>
         </Space>
@@ -273,7 +280,7 @@ export default function Deliveries() {
 
           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
             {d.debtStatus !== 'toliq' && (
-              <Button size="small" type="primary" icon={<DollarOutlined />} onClick={() => openPay(d)}>To'lov</Button>
+              <Button size="small" type="primary" icon={<DollarOutlined />} onClick={() => openPay(d)}>{t('payBtn')}</Button>
             )}
             {d.status === "yo'lda" && (
               <Popconfirm title="Yetkazildi?" onConfirm={() => deliverMut.mutate(d._id)}>
@@ -281,7 +288,7 @@ export default function Deliveries() {
               </Popconfirm>
             )}
             <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(d)} />
-            <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => deleteMut.mutate(d._id)}>
+            <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMut.mutate(d._id)}>
               <Button size="small" type="text" danger icon={<DeleteOutlined />} />
             </Popconfirm>
           </div>
@@ -299,36 +306,36 @@ export default function Deliveries() {
             value={statusFilter}
             onChange={setStatusFilter}
             options={[
-              { label: 'Barchasi', value: '' },
-              { label: "Yo'lda", value: "yo'lda" },
-              { label: 'Yetkazildi', value: 'yetkazildi' },
-              { label: 'Yakunlandi', value: 'yakunlandi' },
+              { label: t('all'), value: '' },
+              { label: t('onRoad'), value: "yo'lda" },
+              { label: t('delivered'), value: 'yetkazildi' },
+              { label: t('finished'), value: 'yakunlandi' },
             ]}
           />
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>Yangi yetkazma</Button>
+        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('newDelivery')}</Button>
       </div>
 
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami yetkazma</span>
+            <span className="summary-stat-label">{t('totalDeliveries2')}</span>
             <span className="summary-stat-value">{deliveries.length}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami qarz</span>
+            <span className="summary-stat-label">{t('debt')}</span>
             <span className="summary-stat-value">{formatMoney(totalDebt, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">To'langan</span>
+            <span className="summary-stat-label">{t('paid')}</span>
             <span className="summary-stat-value" style={{ color: '#52c41a' }}>{formatMoney(totalPaid, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Qoldiq</span>
+            <span className="summary-stat-label">{t('remaining')}</span>
             <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalRemaining, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Yakunlandi</span>
+            <span className="summary-stat-label">{t('finished')}</span>
             <span className="summary-stat-value highlight">{deliveries.filter(d => d.status === 'yakunlandi').length}</span>
           </div>
         </div>
@@ -342,24 +349,24 @@ export default function Deliveries() {
 
       {/* Create/Edit Modal */}
       <Modal
-        title={editing ? 'Yetkazmani tahrirlash' : 'Yangi yetkazma'}
+        title={editing ? t('editDelivery') : t('newDelivery')}
         open={modalOpen}
         onCancel={closeModal}
         onOk={() => form.submit()}
         confirmLoading={createMut.isPending || updateMut.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
         width={580}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="wagonCode" label="Vagon raqami">
+              <Form.Item name="wagonCode" label={t('wagonNumber')}>
                 <Input placeholder="V-001 (ixtiyoriy)" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="customerName" label="Mijoz" rules={[{ required: true, message: 'Mijoz nomini kiriting' }]}>
+              <Form.Item name="customerName" label={t('customer')} rules={[{ required: true, message: 'Mijoz nomini kiriting' }]}>
                 <AutoComplete
                   options={customerOptions}
                   placeholder="Mijoz ismi"
@@ -382,39 +389,39 @@ export default function Deliveries() {
 
           <Row gutter={12}>
             <Col span={8}>
-              <Form.Item name="sentDate" label="Jo'natilgan">
+              <Form.Item name="sentDate" label={t('sentDateLabel')}>
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="arrivedDate" label="Borgan">
+              <Form.Item name="arrivedDate" label={t('arrivedDateLabel')}>
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
               </Form.Item>
             </Col>
             <Col span={8}>
-              <Form.Item name="status" label="Status">
+              <Form.Item name="status" label={t('status')}>
                 <Select options={[
-                  { label: "Yo'lda", value: "yo'lda" },
-                  { label: 'Yetkazildi', value: 'yetkazildi' },
-                  { label: 'Yakunlandi', value: 'yakunlandi' },
+                  { label: t('onRoad'), value: "yo'lda" },
+                  { label: t('delivered'), value: 'yetkazildi' },
+                  { label: t('finished'), value: 'yakunlandi' },
                 ]} />
               </Form.Item>
             </Col>
           </Row>
 
-          <Form.Item name="cargoType" label="Ichida nima">
+          <Form.Item name="cargoType" label={t('cargo')}>
             <Input placeholder="Yog'och, metall..." />
           </Form.Item>
 
-          <Title level={5} style={{ margin: '8px 0 8px' }}>Chegara to'lovlari (mijoz qarzi)</Title>
+          <Title level={5} style={{ margin: '8px 0 8px' }}>{t('borderPayments')}</Title>
           <Row gutter={12} style={{ marginBottom: 0 }}>
             <Col span={12}>
-              <Form.Item name="cargoWeight" label="Yuk og'irligi (t)" style={{ marginBottom: 8 }}>
+              <Form.Item name="cargoWeight" label={t('weight')} style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonAfter="t" />
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="ogirlik" label="Og'irlik yo'qotish (t)" style={{ marginBottom: 8 }}>
+              <Form.Item name="ogirlik" label={t('weightLoss')} style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonAfter="t" />
               </Form.Item>
             </Col>
@@ -478,7 +485,7 @@ export default function Deliveries() {
                 <Card size="small" style={{ background: '#fff7e6' }}>
                   {eff !== weight && weight > 0 && (
                     <div style={{ fontSize: 11, color: '#888', marginBottom: 6 }}>
-                      Effektiv og'irlik: {weight} − {loss} = <strong>{eff} t</strong>
+                      {t('effectiveWeight')} {weight} − {loss} = <strong>{eff} t</strong>
                     </div>
                   )}
                   <Row gutter={8}>
@@ -489,7 +496,7 @@ export default function Deliveries() {
                     {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
                   </Row>
                   <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
-                    Mijoz qarzi: <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
+                    {t('customerDebt2')} <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
                   </div>
                 </Card>
               );
@@ -505,29 +512,29 @@ export default function Deliveries() {
         onCancel={() => { setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); }}
         onOk={() => payForm.submit()}
         confirmLoading={payMut.isPending}
-        okText="To'lov qo'shish"
-        cancelText="Bekor qilish"
+        okText={t('payBtn')}
+        cancelText={t('cancel')}
       >
         {payTarget && (
           <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f6ffed', borderRadius: 8 }}>
             <Row gutter={16}>
-              <Col span={8}><Text type="secondary">Jami qarz:</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
-              <Col span={8}><Text type="secondary">To'langan:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
-              <Col span={8}><Text type="secondary">Qoldiq:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
+              <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
+              <Col span={8}><Text type="secondary">{t('paid')}:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
+              <Col span={8}><Text type="secondary">{t('remaining')}:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
             </Row>
           </div>
         )}
         <Form form={payForm} layout="vertical" onFinish={(values) => {
           payMut.mutate({ id: payTarget._id, data: { ...values, date: values.date?.toISOString() } });
         }}>
-          <Form.Item name="amount" label="To'lov summasi (USD)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+          <Form.Item name="amount" label="To'lov summasi (USD)" rules={[{ required: true, message: t('enterAmount') }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" addonBefore="$" />
           </Form.Item>
-          <Form.Item name="date" label="Sana">
+          <Form.Item name="date" label={t('date')}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>

@@ -13,11 +13,13 @@ import {
   getLentDebts, createLentDebt, addLentDebtPayment, deleteLentDebt,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
+import { useLanguage } from '../../context/LanguageContext';
 
 const { Text, Title } = Typography;
 
 // ─── Mijozlar qarzlari (existing) ───
 function CustomerDebts() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
@@ -37,7 +39,7 @@ function CustomerDebts() {
   const paymentMutation = useMutation({
     mutationFn: createPayment,
     onSuccess: () => {
-      message.success("To'lov muvaffaqiyatli qo'shildi");
+      message.success(t('paymentAdded'));
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
@@ -48,7 +50,7 @@ function CustomerDebts() {
       form.resetFields();
     },
     onError: () => {
-      message.error("To'lov qo'shishda xatolik");
+      message.error(t('paymentError'));
     },
   });
 
@@ -135,23 +137,23 @@ function CustomerDebts() {
   };
 
   const saleColumns = [
-    { title: 'Sana', dataIndex: 'date', key: 'date', render: (val) => formatDate(val) },
-    { title: 'Jami', dataIndex: 'totalAmount', key: 'totalAmount', render: (val, rec) => formatMoney(val, rec.currency) },
-    { title: "To'langan", dataIndex: 'totalPaid', key: 'totalPaid', render: (val, rec) => formatMoney(val, rec.currency) },
-    { title: 'Qarz', dataIndex: 'debt', key: 'debt', render: (val, rec) => <Text type="danger" strong>{formatMoney(val, rec.currency)}</Text> },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: (val) => formatDate(val) },
+    { title: t('total'), dataIndex: 'totalAmount', key: 'totalAmount', render: (val, rec) => formatMoney(val, rec.currency) },
+    { title: t('paid'), dataIndex: 'totalPaid', key: 'totalPaid', render: (val, rec) => formatMoney(val, rec.currency) },
+    { title: t('debt'), dataIndex: 'debt', key: 'debt', render: (val, rec) => <Text type="danger" strong>{formatMoney(val, rec.currency)}</Text> },
     {
       title: '', key: 'actions',
       render: (_, record) => (
-        <Button type="primary" size="small" onClick={() => handlePayment(record)}>To'lov</Button>
+        <Button type="primary" size="small" onClick={() => handlePayment(record)}>{t('payBtn')}</Button>
       ),
     },
   ];
 
   const columns = [
-    { title: 'Mijoz', dataIndex: 'customerName', key: 'customerName', render: (name) => <Text strong>{name}</Text> },
+    { title: t('customer'), dataIndex: 'customerName', key: 'customerName', render: (name) => <Text strong>{name}</Text> },
     { title: 'Sotuvlar', key: 'salesCount', render: (_, rec) => rec.sales.length },
     {
-      title: 'Jami qarz', dataIndex: 'totalDebt', key: 'totalDebt',
+      title: t('totalDebtUsd'), dataIndex: 'totalDebt', key: 'totalDebt',
       render: (val, rec) => <Text type="danger" strong style={{ fontSize: 15 }}>{formatMoney(val, rec.currency)}</Text>,
       sorter: (a, b) => a.totalDebt - b.totalDebt,
       defaultSortOrder: 'descend',
@@ -161,7 +163,7 @@ function CustomerDebts() {
       render: (_, rec) => (
         <Button type="primary" size="small" icon={<DollarOutlined />}
           onClick={(e) => { e.stopPropagation(); handlePayment(rec.sales[0]); }}>
-          To'lash
+          {t('pay')}
         </Button>
       ),
     },
@@ -183,18 +185,18 @@ function CustomerDebts() {
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Qarzdor mijozlar</span>
+            <span className="summary-stat-label">{t('debtorCustomers')}</span>
             <span className="summary-stat-value">{customerDebts.length}</span>
           </div>
           {totalDebtUSD > 0 && (
             <div className="summary-stat">
-              <span className="summary-stat-label">Jami qarz (USD)</span>
+              <span className="summary-stat-label">{t('totalDebtUsd')}</span>
               <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtUSD, 'USD')}</span>
             </div>
           )}
           {totalDebtRUB > 0 && (
             <div className="summary-stat">
-              <span className="summary-stat-label">Jami qarz (RUB)</span>
+              <span className="summary-stat-label">{t('totalDebtRub')}</span>
               <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtRUB, 'RUB')}</span>
             </div>
           )}
@@ -215,7 +217,7 @@ function CustomerDebts() {
                   {cd.sales.slice(0, 3).map((s) => (
                     <div key={s._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                       <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(s.date)} — {formatMoney(s.debt, s.currency)}</Text>
-                      <Button type="primary" size="small" onClick={() => handlePayment(s)}>To'lash</Button>
+                      <Button type="primary" size="small" onClick={() => handlePayment(s)}>{t('pay')}</Button>
                     </div>
                   ))}
                   {cd.sales.length > 3 && <Text type="secondary" style={{ fontSize: 11 }}>+{cd.sales.length - 3} ta yana...</Text>}
@@ -245,36 +247,36 @@ function CustomerDebts() {
       )}
 
       <Modal
-        title="To'lov qilish"
+        title={t('makePayment')}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={() => { setModalOpen(false); setSelectedSale(null); }}
         confirmLoading={paymentMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         {selectedSale && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">
-              {selectedSale.customer?.name} — Qarz: {formatMoney(selectedSale.debt, selectedSale.currency)}
+              {selectedSale.customer?.name} — {t('debt')}: {formatMoney(selectedSale.debt, selectedSale.currency)}
             </Text>
           </div>
         )}
         <Form form={form} layout="vertical">
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
-            <InputNumber style={{ width: '100%' }} min={1} max={selectedSale?.debt} placeholder="Summa" />
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: "Summani kiriting" }]}>
+            <InputNumber style={{ width: '100%' }} min={1} max={selectedSale?.debt} placeholder={t('amount')} />
           </Form.Item>
-          <Form.Item name="currency" label="Valyuta" rules={[{ required: true }]}>
+          <Form.Item name="currency" label={t('currency')} rules={[{ required: true }]}>
             <Select>
               <Select.Option value="USD">USD</Select.Option>
               <Select.Option value="RUB">RUB</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="date" label="Sana" rules={[{ required: true, message: "Sanani tanlang" }]}>
+          <Form.Item name="date" label={t('date')} rules={[{ required: true, message: "Sanani tanlang" }]}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
@@ -284,6 +286,7 @@ function CustomerDebts() {
 
 // ─── Mening qarzdorligim (card-based) ───
 function MyDebtsSection() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [debtForm] = Form.useForm();
   const [payForm] = Form.useForm();
@@ -303,11 +306,11 @@ function MyDebtsSection() {
       queryClient.invalidateQueries({ queryKey: ['my-debts'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
-      message.success("Qarz qo'shildi");
+      message.success(t('debtAdded'));
       setDebtModalOpen(false);
       debtForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const payMutation = useMutation({
@@ -316,12 +319,12 @@ function MyDebtsSection() {
       queryClient.invalidateQueries({ queryKey: ['my-debts'] });
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
-      message.success("To'lov qo'shildi");
+      message.success(t('paymentAdded'));
       setPayModalOpen(false);
       setSelectedDebt(null);
       payForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const deleteMutation = useMutation({
@@ -331,7 +334,7 @@ function MyDebtsSection() {
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      message.success("Qarz o'chirildi");
+      message.success(t('debtDeleted'));
     },
   });
 
@@ -383,25 +386,25 @@ function MyDebtsSection() {
     <>
       <Card style={{ marginBottom: 16 }}>
         <Space size="large" align="center">
-          <Title level={4} style={{ margin: 0 }}>Mening qarzdorligim</Title>
+          <Title level={4} style={{ margin: 0 }}>{t('myDebtsTitle')}</Title>
           {totalUSD > 0 && (
             <Tag color="orange" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalUSD, 'USD')}
+              {t('total')}: {formatMoney(totalUSD, 'USD')}
             </Tag>
           )}
           {totalRUB > 0 && (
             <Tag color="orange" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalRUB, 'RUB')}
+              {t('total')}: {formatMoney(totalRUB, 'RUB')}
             </Tag>
           )}
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>
-            Qarz qo'shish
+            {t('addDebt')}
           </Button>
         </Space>
       </Card>
 
       {debts.length === 0 ? (
-        <Empty description="Qarzlar yo'q" />
+        <Empty description={t('noDebts')} />
       ) : (
         <Row gutter={[16, 16]}>
           {debts.map((debt) => {
@@ -423,7 +426,7 @@ function MyDebtsSection() {
                       onClick={() => handlePay(debt)}
                       key="pay"
                     >
-                      To'lash
+                      {t('pay')}
                     </Button>,
                     <Button
                       type="link"
@@ -431,10 +434,10 @@ function MyDebtsSection() {
                       onClick={() => handleViewHistory(debt)}
                       key="view"
                     >
-                      Tarix ({debt.payments?.length || 0})
+                      {t('history')} ({debt.payments?.length || 0})
                     </Button>,
                     <Popconfirm
-                      title="O'chirishni tasdiqlaysizmi?"
+                      title={t('deleteConfirm')}
                       onConfirm={() => deleteMutation.mutate(debt._id)}
                       key="delete"
                     >
@@ -444,20 +447,20 @@ function MyDebtsSection() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text strong style={{ fontSize: 16 }}>{debt.creditor}</Text>
-                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>To'langan</Tag>}
+                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>{t('paidStatus')}</Tag>}
                   </div>
 
                   <div style={{ marginBottom: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">Qarz:</Text>
+                      <Text type="secondary">{t('debtAmount')}</Text>
                       <Text strong>{formatMoney(debt.amount, debt.currency)}</Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">To'langan:</Text>
+                      <Text type="secondary">{t('paidAmount2')}</Text>
                       <Text style={{ color: '#52c41a' }} strong>{formatMoney(debt.paidAmount, debt.currency)}</Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">Qoldiq:</Text>
+                      <Text type="secondary">{t('remainingAmount')}</Text>
                       <Text type="danger" strong>{formatMoney(debt.remainingDebt, debt.currency)}</Text>
                     </div>
                   </div>
@@ -484,69 +487,69 @@ function MyDebtsSection() {
 
       {/* Create debt modal */}
       <Modal
-        title="Yangi qarz qo'shish"
+        title={t('addMyDebt')}
         open={debtModalOpen}
         onOk={handleCreateDebt}
         onCancel={() => { setDebtModalOpen(false); debtForm.resetFields(); }}
         confirmLoading={createMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         <Form form={debtForm} layout="vertical">
-          <Form.Item name="creditor" label="Kimga qarz" rules={[{ required: true, message: "Kreditor ismini kiriting" }]}>
+          <Form.Item name="creditor" label={t('toWhom')} rules={[{ required: true, message: t('creditorName') }]}>
             <Input placeholder="Ism" />
           </Form.Item>
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: "Summani kiriting" }]}>
             <InputNumber style={{ width: '100%' }} min={1} placeholder="0" />
           </Form.Item>
-          <Form.Item name="currency" label="Valyuta" initialValue="USD">
+          <Form.Item name="currency" label={t('currency')} initialValue="USD">
             <Select>
               <Select.Option value="USD">USD</Select.Option>
               <Select.Option value="RUB">RUB</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="description" label="Izoh">
-            <Input.TextArea rows={2} placeholder="Izoh" />
+          <Form.Item name="description" label={t('note')}>
+            <Input.TextArea rows={2} placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Payment modal */}
       <Modal
-        title="Qarz to'lash"
+        title={t('payDebt')}
         open={payModalOpen}
         onOk={handlePaySubmit}
         onCancel={() => { setPayModalOpen(false); setSelectedDebt(null); }}
         confirmLoading={payMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         {selectedDebt && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">
-              {selectedDebt.creditor} — Qoldiq: {formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}
+              {selectedDebt.creditor} — {t('remainingAmount')} {formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}
             </Text>
           </div>
         )}
         <Form form={payForm} layout="vertical">
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: "Summani kiriting" }]}>
             <InputNumber style={{ width: '100%' }} min={1} max={selectedDebt?.remainingDebt} placeholder="0" />
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Payment history modal */}
       <Modal
-        title={selectedDebt ? `${selectedDebt.creditor} — To'lov tarixi` : "To'lov tarixi"}
+        title={selectedDebt ? `${selectedDebt.creditor} — ${t('paymentHistory')}` : t('paymentHistory')}
         open={historyModalOpen}
         onCancel={() => { setHistoryModalOpen(false); setSelectedDebt(null); }}
         footer={null}
@@ -555,15 +558,15 @@ function MyDebtsSection() {
           <>
             <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Jami qarz:</Text>
+                <Text type="secondary">{t('debtAmount')}</Text>
                 <Text strong>{formatMoney(selectedDebt.amount, selectedDebt.currency)}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">To'langan:</Text>
+                <Text type="secondary">{t('paidAmount2')}</Text>
                 <Text style={{ color: '#52c41a' }} strong>{formatMoney(selectedDebt.paidAmount, selectedDebt.currency)}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Qoldiq:</Text>
+                <Text type="secondary">{t('remainingAmount')}</Text>
                 <Text type="danger" strong>{formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}</Text>
               </div>
             </div>
@@ -584,7 +587,7 @@ function MyDebtsSection() {
                 }))}
               />
             ) : (
-              <Empty description="To'lovlar yo'q" />
+              <Empty description={t('noPayments')} />
             )}
           </>
         )}
@@ -595,6 +598,7 @@ function MyDebtsSection() {
 
 // ─── Mendan qarzdarlar (I lent money to someone) ───
 function LentDebtsSection() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [debtForm] = Form.useForm();
   const [payForm] = Form.useForm();
@@ -619,30 +623,30 @@ function LentDebtsSection() {
     mutationFn: createLentDebt,
     onSuccess: () => {
       invalidateAll();
-      message.success("Qarz qo'shildi");
+      message.success(t('debtAdded'));
       setDebtModalOpen(false);
       debtForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const payMutation = useMutation({
     mutationFn: ({ id, data }) => addLentDebtPayment(id, data),
     onSuccess: () => {
       invalidateAll();
-      message.success("To'lov qo'shildi");
+      message.success(t('paymentAdded'));
       setPayModalOpen(false);
       setSelectedDebt(null);
       payForm.resetFields();
     },
-    onError: () => message.error('Xatolik'),
+    onError: () => message.error(t('error')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteLentDebt,
     onSuccess: () => {
       invalidateAll();
-      message.success("Qarz o'chirildi");
+      message.success(t('debtDeleted'));
     },
   });
 
@@ -694,25 +698,25 @@ function LentDebtsSection() {
     <>
       <Card style={{ marginBottom: 16 }}>
         <Space size="large" align="center">
-          <Title level={4} style={{ margin: 0 }}>Mendan qarzdarlar</Title>
+          <Title level={4} style={{ margin: 0 }}>{t('lentDebtsTitle')}</Title>
           {totalUSD > 0 && (
             <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalUSD, 'USD')}
+              {t('total')}: {formatMoney(totalUSD, 'USD')}
             </Tag>
           )}
           {totalRUB > 0 && (
             <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
-              Jami: {formatMoney(totalRUB, 'RUB')}
+              {t('total')}: {formatMoney(totalRUB, 'RUB')}
             </Tag>
           )}
           <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>
-            Qarz berish
+            {t('giveDebt')}
           </Button>
         </Space>
       </Card>
 
       {debts.length === 0 ? (
-        <Empty description="Qarzdarlar yo'q" />
+        <Empty description={t('noLentDebts')} />
       ) : (
         <Row gutter={[16, 16]}>
           {debts.map((debt) => {
@@ -742,10 +746,10 @@ function LentDebtsSection() {
                       onClick={() => handleViewHistory(debt)}
                       key="view"
                     >
-                      Tarix ({debt.payments?.length || 0})
+                      {t('history')} ({debt.payments?.length || 0})
                     </Button>,
                     <Popconfirm
-                      title="O'chirishni tasdiqlaysizmi?"
+                      title={t('deleteConfirm')}
                       onConfirm={() => deleteMutation.mutate(debt._id)}
                       key="delete"
                     >
@@ -755,20 +759,20 @@ function LentDebtsSection() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <Text strong style={{ fontSize: 16 }}>{debt.debtor}</Text>
-                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>Qaytarildi</Tag>}
+                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>{t('returnedStatus')}</Tag>}
                   </div>
 
                   <div style={{ marginBottom: 8 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">Berilgan:</Text>
+                      <Text type="secondary">{t('given')}</Text>
                       <Text strong>{formatMoney(debt.amount, debt.currency)}</Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">Qaytarilgan:</Text>
+                      <Text type="secondary">{t('returned')}</Text>
                       <Text style={{ color: '#52c41a' }} strong>{formatMoney(debt.paidAmount, debt.currency)}</Text>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">Qoldiq:</Text>
+                      <Text type="secondary">{t('remainingAmount')}</Text>
                       <Text type="danger" strong>{formatMoney(debt.remainingDebt, debt.currency)}</Text>
                     </div>
                   </div>
@@ -795,32 +799,32 @@ function LentDebtsSection() {
 
       {/* Create lent debt modal */}
       <Modal
-        title="Qarz berish"
+        title={t('giveDebt')}
         open={debtModalOpen}
         onOk={handleCreateDebt}
         onCancel={() => { setDebtModalOpen(false); debtForm.resetFields(); }}
         confirmLoading={createMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         <Form form={debtForm} layout="vertical">
           <Form.Item name="debtor" label="Kimga qarz berildi" rules={[{ required: true, message: "Ismni kiriting" }]}>
             <Input placeholder="Ism" />
           </Form.Item>
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: "Summani kiriting" }]}>
             <InputNumber style={{ width: '100%' }} min={1} placeholder="0" />
           </Form.Item>
-          <Form.Item name="currency" label="Valyuta" initialValue="USD">
+          <Form.Item name="currency" label={t('currency')} initialValue="USD">
             <Select>
               <Select.Option value="USD">USD</Select.Option>
               <Select.Option value="RUB">RUB</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="description" label="Izoh">
-            <Input.TextArea rows={2} placeholder="Izoh" />
+          <Form.Item name="description" label={t('note')}>
+            <Input.TextArea rows={2} placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
@@ -832,32 +836,32 @@ function LentDebtsSection() {
         onOk={handlePaySubmit}
         onCancel={() => { setPayModalOpen(false); setSelectedDebt(null); }}
         confirmLoading={payMutation.isPending}
-        okText="Saqlash"
-        cancelText="Bekor qilish"
+        okText={t('save')}
+        cancelText={t('cancel')}
       >
         {selectedDebt && (
           <div style={{ marginBottom: 16 }}>
             <Text type="secondary">
-              {selectedDebt.debtor} — Qoldiq: {formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}
+              {selectedDebt.debtor} — {t('remainingAmount')} {formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}
             </Text>
           </div>
         )}
         <Form form={payForm} layout="vertical">
-          <Form.Item name="amount" label="Summa" rules={[{ required: true, message: "Summani kiriting" }]}>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: "Summani kiriting" }]}>
             <InputNumber style={{ width: '100%' }} min={1} max={selectedDebt?.remainingDebt} placeholder="0" />
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
-            <Input placeholder="Izoh" />
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
       </Modal>
 
       {/* Payment history modal */}
       <Modal
-        title={selectedDebt ? `${selectedDebt.debtor} — Qaytarish tarixi` : "Qaytarish tarixi"}
+        title={selectedDebt ? `${selectedDebt.debtor} — ${t('returnHistory')}` : t('returnHistory')}
         open={historyModalOpen}
         onCancel={() => { setHistoryModalOpen(false); setSelectedDebt(null); }}
         footer={null}
@@ -866,15 +870,15 @@ function LentDebtsSection() {
           <>
             <div style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Berilgan:</Text>
+                <Text type="secondary">{t('given')}</Text>
                 <Text strong>{formatMoney(selectedDebt.amount, selectedDebt.currency)}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Qaytarilgan:</Text>
+                <Text type="secondary">{t('returned')}</Text>
                 <Text style={{ color: '#52c41a' }} strong>{formatMoney(selectedDebt.paidAmount, selectedDebt.currency)}</Text>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <Text type="secondary">Qoldiq:</Text>
+                <Text type="secondary">{t('remainingAmount')}</Text>
                 <Text type="danger" strong>{formatMoney(selectedDebt.remainingDebt, selectedDebt.currency)}</Text>
               </div>
             </div>
@@ -895,7 +899,7 @@ function LentDebtsSection() {
                 }))}
               />
             ) : (
-              <Empty description="Qaytarishlar yo'q" />
+              <Empty description={t('noReturns')} />
             )}
           </>
         )}
@@ -906,14 +910,15 @@ function LentDebtsSection() {
 
 // ─── Main page ───
 export default function Debts() {
+  const { t } = useLanguage();
   return (
     <div>
       <Tabs
         defaultActiveKey="customers"
         items={[
-          { key: 'customers', label: 'Mijozlar qarzlari', children: <CustomerDebts /> },
-          { key: 'my-debts', label: 'Mening qarzdorligim', children: <MyDebtsSection /> },
-          { key: 'lent-debts', label: 'Mendan qarzdarlar', children: <LentDebtsSection /> },
+          { key: 'customers', label: t('customerDebtsTab'), children: <CustomerDebts /> },
+          { key: 'my-debts', label: t('myDebtsTab'), children: <MyDebtsSection /> },
+          { key: 'lent-debts', label: t('lentDebtsTab'), children: <LentDebtsSection /> },
         ]}
         size="large"
         style={{ marginBottom: 16 }}

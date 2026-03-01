@@ -8,12 +8,14 @@ import dayjs from 'dayjs';
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier, getSupplierWagons,
   getCashBalance, getRubTransactions, transferRub } from '../../api';
 import { formatDate, formatM3, statusLabels, statusColors } from '../../utils/format';
+import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
 
 const { Text } = Typography;
 
 // ==================== RUB ACCOUNTS SECTION ====================
 function RubAccounts() {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [transferOpen, setTransferOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
@@ -40,11 +42,11 @@ function RubAccounts() {
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['rub-tx-personal'] });
       queryClient.invalidateQueries({ queryKey: ['rub-tx-russia'] });
-      message.success('O\'tkazma amalga oshirildi');
+      message.success(t('transferSuccess'));
       setTransferOpen(false);
       form.resetFields();
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error(t('error')),
   });
 
   const handleTransfer = async () => {
@@ -56,18 +58,18 @@ function RubAccounts() {
   };
 
   const txColumns = [
-    { title: 'Sana', dataIndex: 'date', key: 'date', width: 100, render: (v) => formatDate(v) },
+    { title: t('date'), dataIndex: 'date', key: 'date', width: 100, render: (v) => formatDate(v) },
     {
-      title: 'Turi',
+      title: t('type'),
       dataIndex: 'type',
       key: 'type',
       width: 80,
-      render: (t) => t === 'kirim'
-        ? <Tag color="green">Kirim</Tag>
-        : <Tag color="red">Chiqim</Tag>,
+      render: (tp) => tp === 'kirim'
+        ? <Tag color="green">{t('income')}</Tag>
+        : <Tag color="red">{t('expense')}</Tag>,
     },
     {
-      title: 'Summa',
+      title: t('amount'),
       dataIndex: 'amount',
       key: 'amount',
       render: (v, r) => (
@@ -76,7 +78,7 @@ function RubAccounts() {
         </Text>
       ),
     },
-    { title: 'Izoh', dataIndex: 'description', key: 'description', ellipsis: true },
+    { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
   ];
 
   const rubPersonal = balance.RUB_personal || 0;
@@ -87,17 +89,17 @@ function RubAccounts() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Text strong style={{ fontSize: 16 }}>
           <WalletOutlined style={{ marginRight: 8 }} />
-          RUB Hisoblar
+          {t('rubAccounts')}
         </Text>
         <Button icon={<SwapOutlined />} onClick={() => setTransferOpen(true)}>
-          Shaxsiy → Rossiya
+          {t('personalToRussia')}
         </Button>
       </div>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={12}>
           <Card size="small" style={{ background: rubPersonal >= 0 ? '#f6ffed' : '#fff1f0', border: `1px solid ${rubPersonal >= 0 ? '#b7eb8f' : '#ffa39e'}` }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Shaxsiy (qo'ldagi)</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{t('personalShort')}</Text>
             <div style={{ fontSize: 20, fontWeight: 700, color: rubPersonal >= 0 ? '#52c41a' : '#ff4d4f' }}>
               {rubPersonal.toLocaleString('ru')} ₽
             </div>
@@ -105,7 +107,7 @@ function RubAccounts() {
         </Col>
         <Col span={12}>
           <Card size="small" style={{ background: rubRussia >= 0 ? '#e6f7ff' : '#fff1f0', border: `1px solid ${rubRussia >= 0 ? '#91d5ff' : '#ffa39e'}` }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>Rossiya (xaridlar)</Text>
+            <Text type="secondary" style={{ fontSize: 12 }}>{t('russiaShort')}</Text>
             <div style={{ fontSize: 20, fontWeight: 700, color: rubRussia >= 0 ? '#1677ff' : '#ff4d4f' }}>
               {rubRussia.toLocaleString('ru')} ₽
             </div>
@@ -120,7 +122,7 @@ function RubAccounts() {
         items={[
           {
             key: 'personal',
-            label: 'Shaxsiy tarixi',
+            label: t('personalHistory'),
             children: (
               <Table
                 rowKey="_id"
@@ -129,13 +131,13 @@ function RubAccounts() {
                 loading={personalLoading}
                 size="small"
                 pagination={{ pageSize: 10, size: 'small' }}
-                locale={{ emptyText: 'Tranzaksiya yo\'q' }}
+                locale={{ emptyText: t('noTransactions') }}
               />
             ),
           },
           {
             key: 'russia',
-            label: 'Rossiya tarixi',
+            label: t('russiaHistory'),
             children: (
               <Table
                 rowKey="_id"
@@ -144,7 +146,7 @@ function RubAccounts() {
                 loading={russiaLoading}
                 size="small"
                 pagination={{ pageSize: 10, size: 'small' }}
-                locale={{ emptyText: 'Tranzaksiya yo\'q' }}
+                locale={{ emptyText: t('noTransactions') }}
               />
             ),
           },
@@ -152,22 +154,22 @@ function RubAccounts() {
       />
 
       <Modal
-        title="Shaxsiy → Rossiya o'tkazma"
+        title={t('rubTransferModal')}
         open={transferOpen}
         onOk={handleTransfer}
         onCancel={() => { setTransferOpen(false); form.resetFields(); }}
         confirmLoading={transferMutation.isPending}
-        okText="O'tkazish"
-        cancelText="Bekor qilish"
+        okText={t('transfer')}
+        cancelText={t('cancel')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="amount" label="Summa (RUB)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+          <Form.Item name="amount" label={t('amountRub')} rules={[{ required: true, message: t('enterAmount') }]}>
             <InputNumber style={{ width: '100%' }} min={1} formatter={(v) => v?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} placeholder="0" />
           </Form.Item>
-          <Form.Item name="date" label="Sana" initialValue={dayjs()}>
+          <Form.Item name="date" label={t('date')} initialValue={dayjs()}>
             <DatePicker style={{ width: '100%' }} />
           </Form.Item>
-          <Form.Item name="note" label="Izoh">
+          <Form.Item name="note" label={t('note')}>
             <Input placeholder="Ixtiyoriy" />
           </Form.Item>
         </Form>
@@ -178,6 +180,7 @@ function RubAccounts() {
 
 // ==================== MAIN PAGE ====================
 const Suppliers = () => {
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState('table');
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
@@ -201,29 +204,29 @@ const Suppliers = () => {
     mutationFn: createSupplier,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      message.success('Rus qo\'shildi');
+      message.success(t('supplierAdded'));
       closeModal();
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error(t('error')),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => updateSupplier(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      message.success('Rus yangilandi');
+      message.success(t('supplierUpdated'));
       closeModal();
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error(t('error')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteSupplier,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suppliers'] });
-      message.success('Rus o\'chirildi');
+      message.success(t('supplierDeleted'));
     },
-    onError: () => message.error('Xatolik yuz berdi'),
+    onError: () => message.error(t('error')),
   });
 
   const openCreate = () => {
@@ -269,18 +272,18 @@ const Suppliers = () => {
   };
 
   const wagonColumns = [
-    { title: 'Kod', dataIndex: 'wagonCode', key: 'wagonCode', width: 110 },
+    { title: t('code'), dataIndex: 'wagonCode', key: 'wagonCode', width: 110 },
     {
-      title: 'Turi', dataIndex: 'type', key: 'type', width: 80,
-      render: (t) => t === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag>,
+      title: t('type'), dataIndex: 'type', key: 'type', width: 80,
+      render: (tp) => tp === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag>,
     },
     {
-      title: 'Status', dataIndex: 'status', key: 'status', width: 90,
+      title: t('status'), dataIndex: 'status', key: 'status', width: 90,
       render: (s) => <Tag color={statusColors[s]}>{statusLabels[s] || s}</Tag>,
     },
-    { title: 'Qayerdan', dataIndex: 'origin', key: 'origin', width: 100 },
-    { title: 'Kelgan', dataIndex: 'arrivedDate', key: 'arrivedDate', width: 100, render: (v) => formatDate(v) },
-    { title: 'Jami m³', dataIndex: 'totalM3', key: 'totalM3', width: 90, render: (v) => formatM3(v) },
+    { title: t('origin'), dataIndex: 'origin', key: 'origin', width: 100 },
+    { title: t('arrivedDate'), dataIndex: 'arrivedDate', key: 'arrivedDate', width: 100, render: (v) => formatDate(v) },
+    { title: t('totalM3'), dataIndex: 'totalM3', key: 'totalM3', width: 90, render: (v) => formatM3(v) },
     {
       title: "Yog'och (₽)", key: 'woodCost', width: 120,
       render: (_, r) => {
@@ -291,20 +294,20 @@ const Suppliers = () => {
   ];
 
   const columns = [
-    { title: 'Ism', dataIndex: 'name', key: 'name' },
-    { title: 'Telefon', dataIndex: 'phone', key: 'phone' },
-    { title: 'Izoh', dataIndex: 'note', key: 'note', ellipsis: true },
-    { title: 'Sana', dataIndex: 'createdAt', key: 'createdAt', render: (val) => formatDate(val) },
+    { title: t('name'), dataIndex: 'name', key: 'name' },
+    { title: t('phone'), dataIndex: 'phone', key: 'phone' },
+    { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+    { title: t('date'), dataIndex: 'createdAt', key: 'createdAt', render: (val) => formatDate(val) },
     {
-      title: 'Amallar', key: 'actions',
+      title: t('actions'), key: 'actions',
       render: (_, record) => (
         <Space>
           <Button icon={<EyeOutlined />} onClick={() => openDrawer(record)} />
           <Button icon={<EditOutlined />} onClick={() => openEdit(record)} />
           <Popconfirm
-            title="Rusni o'chirishni tasdiqlaysizmi?"
+            title={t('deleteSupplierConfirm')}
             onConfirm={() => deleteMutation.mutate(record._id)}
-            okText="Ha" cancelText="Yo'q"
+            okText={t('yes')} cancelText={t('no')}
           >
             <Button danger icon={<DeleteOutlined />} />
           </Popconfirm>
@@ -331,7 +334,7 @@ const Suppliers = () => {
               <Space size="small">
                 <Button size="small" icon={<EyeOutlined />} onClick={() => openDrawer(s)} />
                 <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(s)} />
-                <Popconfirm title="O'chirishni tasdiqlaysizmi?"
+                <Popconfirm title={t('deleteConfirm')}
                   onConfirm={() => deleteMutation.mutate(s._id)}>
                   <Button size="small" danger icon={<DeleteOutlined />} />
                 </Popconfirm>
@@ -350,7 +353,7 @@ const Suppliers = () => {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Space>
-          <h2 style={{ margin: 0 }}>Ruslar</h2>
+          <h2 style={{ margin: 0 }}>{t('suppliersPage')}</h2>
           <Segmented value={viewMode} onChange={setViewMode}
             options={[
               { value: 'card', icon: <AppstoreOutlined /> },
@@ -358,18 +361,18 @@ const Suppliers = () => {
             ]} />
         </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Rus qo'shish
+          {t('addSupplier')}
         </Button>
       </div>
 
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
           <div className="summary-stat">
-            <span className="summary-stat-label">Jami ruslar</span>
+            <span className="summary-stat-label">{t('totalSuppliers')}</span>
             <span className="summary-stat-value highlight">{(suppliers || []).length}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Telefon bor</span>
+            <span className="summary-stat-label">{t('withPhone')}</span>
             <span className="summary-stat-value">{(suppliers || []).filter(s => s.phone).length}</span>
           </div>
         </div>
@@ -381,19 +384,19 @@ const Suppliers = () => {
 
       {/* Create / Edit Modal */}
       <Modal
-        title={editingSupplier ? 'Rusni tahrirlash' : 'Rus qo\'shish'}
+        title={editingSupplier ? t('editSupplier') : t('addSupplier')}
         open={modalOpen}
         onOk={handleSubmit}
         onCancel={closeModal}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
-        okText="Saqlash" cancelText="Bekor qilish"
+        okText={t('save')} cancelText={t('cancel')}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Ism" rules={[{ required: true, message: 'Ismni kiriting' }]}>
+          <Form.Item name="name" label={t('name')} rules={[{ required: true, message: t('enterName') }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="phone" label="Telefon"><Input /></Form.Item>
-          <Form.Item name="note" label="Izoh"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item name="phone" label={t('phone')}><Input /></Form.Item>
+          <Form.Item name="note" label={t('note')}><Input.TextArea rows={3} /></Form.Item>
         </Form>
       </Modal>
 
@@ -408,15 +411,15 @@ const Suppliers = () => {
         {selectedSupplier && (
           <>
             <Descriptions bordered size="small" column={2} style={{ marginBottom: 24 }}>
-              <Descriptions.Item label="Telefon">{selectedSupplier.phone || '—'}</Descriptions.Item>
-              <Descriptions.Item label="Qo'shilgan">{formatDate(selectedSupplier.createdAt)}</Descriptions.Item>
+              <Descriptions.Item label={t('phone')}>{selectedSupplier.phone || '—'}</Descriptions.Item>
+              <Descriptions.Item label={t('created')}>{formatDate(selectedSupplier.createdAt)}</Descriptions.Item>
               {selectedSupplier.note && (
-                <Descriptions.Item label="Izoh" span={2}>{selectedSupplier.note}</Descriptions.Item>
+                <Descriptions.Item label={t('note')} span={2}>{selectedSupplier.note}</Descriptions.Item>
               )}
             </Descriptions>
 
             <h3 style={{ marginBottom: 12 }}>
-              Vagonlar
+              {t('wagons')}
               {supplierWagons && (
                 <Text type="secondary" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>
                   ({supplierWagons.length} ta)

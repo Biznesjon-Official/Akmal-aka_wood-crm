@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { message } from 'antd';
 import { checkAuthStatus, verifyPin, setupPin } from '../api';
+import { translations } from '../i18n/translations';
+const tl = (key) => { const lang = localStorage.getItem('lang') || 'uz'; return translations[lang]?.[key] ?? translations.uz[key] ?? key; };
 
 const BTN = {
   width: 72, height: 72, borderRadius: '50%', fontSize: 24, fontWeight: 600,
@@ -46,7 +48,7 @@ export default function PinLock({ onUnlock }) {
       } catch {
         doShake();
         setPin('');
-        message.error("Noto'g'ri PIN");
+        message.error(tl('pinWrong'));
       }
     } else if (mode === 'setup') {
       setSetupFirst(code);
@@ -56,7 +58,7 @@ export default function PinLock({ onUnlock }) {
       if (code !== setupFirst) {
         doShake();
         setPin('');
-        message.error('PIN mos kelmadi, qaytadan kiriting');
+        message.error(tl('pinMismatch'));
         setMode('setup');
         setSetupFirst('');
       } else {
@@ -82,7 +84,7 @@ export default function PinLock({ onUnlock }) {
     }} />
   ));
 
-  const title = mode === 'login' ? 'PIN kiriting' : mode === 'setup' ? 'Yangi PIN o\'rnating' : 'PIN ni tasdiqlang';
+  const title = mode === 'login' ? tl('pinTitle') : mode === 'setup' ? tl('pinSetup') : tl('pinConfirm');
 
   const keys = [
     ['1','2','3'],

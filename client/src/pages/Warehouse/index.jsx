@@ -5,12 +5,14 @@ import { useQuery } from '@tanstack/react-query';
 import { getWagons } from '../../api';
 import { formatM3, formatMoney, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
+import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
 
 const { Text } = Typography;
 
 // Quantity popover for adding to cart
 function SellPopover({ bundle, children }) {
+  const { t } = useLanguage();
   const { addItem } = useCart();
   const [qty, setQty] = useState(1);
   const [open, setOpen] = useState(false);
@@ -28,7 +30,7 @@ function SellPopover({ bundle, children }) {
       maxQuantity: bundle.remainingCount,
       costPricePerM3: bundle.costPricePerM3 || 0,
     });
-    message.success(`${qty} dona savatchaga qo'shildi`);
+    message.success(`${qty} ${t('pieces')} ${t('addToCart')}`);
     setQty(1);
     setOpen(false);
   };
@@ -42,10 +44,10 @@ function SellPopover({ bundle, children }) {
         <Space>
           <InputNumber size="small" min={1} max={bundle.remainingCount}
             value={qty} onChange={setQty} style={{ width: 80 }} />
-          <Button size="small" type="primary" onClick={handleAdd}>Qo'shish</Button>
+          <Button size="small" type="primary" onClick={handleAdd}>{t('addToCart')}</Button>
         </Space>
       }
-      title="Nechta?"
+      title={t('howMany')}
     >
       {children}
     </Popover>
@@ -53,6 +55,7 @@ function SellPopover({ bundle, children }) {
 }
 
 export default function Warehouse() {
+  const { t } = useLanguage();
   const [filters, setFilters] = useState({ thickness: null, width: null, length: null });
   const [viewMode, setViewMode] = useState('table');
 
@@ -129,16 +132,16 @@ export default function Warehouse() {
   }, [warehouseGroups, filters]);
 
   const baseColumns = [
-    { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode', render: (code) => <Tag color="blue">{code}</Tag> },
-    { title: 'Qalinlik (mm)', dataIndex: 'thickness', key: 'thickness' },
-    { title: 'Eni (mm)', dataIndex: 'width', key: 'width' },
-    { title: 'Uzunlik (m)', dataIndex: 'length', key: 'length' },
-    { title: 'Jami soni', dataIndex: 'count', key: 'count' },
-    { title: 'Qoldiq', dataIndex: 'remainingCount', key: 'remainingCount',
+    { title: t('wagons'), dataIndex: 'wagonCode', key: 'wagonCode', render: (code) => <Tag color="blue">{code}</Tag> },
+    { title: t('thickness'), dataIndex: 'thickness', key: 'thickness' },
+    { title: t('width'), dataIndex: 'width', key: 'width' },
+    { title: t('length'), dataIndex: 'length', key: 'length' },
+    { title: t('count'), dataIndex: 'count', key: 'count' },
+    { title: t('remaining'), dataIndex: 'remainingCount', key: 'remainingCount',
       render: (val, r) => <Text type={val < r.count ? 'warning' : undefined}>{val}</Text> },
-    { title: 'm³/dona', dataIndex: 'm3PerPiece', key: 'm3PerPiece', render: formatM3 },
-    { title: 'Jami m³', key: 'totalM3', render: (_, r) => formatM3((r.m3PerPiece || 0) * (r.remainingCount || 0)) },
-    { title: 'Tannarx/m³', dataIndex: 'costPricePerM3', key: 'costPricePerM3', render: (v) => v > 0 ? formatMoney(v) : '—' },
+    { title: t('unitM3'), dataIndex: 'm3PerPiece', key: 'm3PerPiece', render: formatM3 },
+    { title: t('totalM3'), key: 'totalM3', render: (_, r) => formatM3((r.m3PerPiece || 0) * (r.remainingCount || 0)) },
+    { title: t('costPerM3'), dataIndex: 'costPricePerM3', key: 'costPricePerM3', render: (v) => v > 0 ? formatMoney(v) : '—' },
   ];
 
   const tableColumns = [
@@ -147,7 +150,7 @@ export default function Warehouse() {
       title: '', key: 'sell', width: 80,
       render: (_, r) => r.remainingCount > 0 ? (
         <SellPopover bundle={r}>
-          <Button size="small" type="primary" icon={<ShoppingCartOutlined />}>Sotish</Button>
+          <Button size="small" type="primary" icon={<ShoppingCartOutlined />}>{t('sell')}</Button>
         </SellPopover>
       ) : null,
     },
@@ -165,18 +168,18 @@ export default function Warehouse() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <Space size="large" wrap>
             <div>
-              <Text type="secondary">Qalinlik (mm)</Text><br />
-              <InputNumber placeholder="Qalinlik" value={filters.thickness}
+              <Text type="secondary">{t('thickness')}</Text><br />
+              <InputNumber placeholder={t('thickness')} value={filters.thickness}
                 onChange={(val) => setFilters((f) => ({ ...f, thickness: val }))} style={{ width: 140 }} allowClear />
             </div>
             <div>
-              <Text type="secondary">Eni (mm)</Text><br />
-              <InputNumber placeholder="Eni" value={filters.width}
+              <Text type="secondary">{t('width')}</Text><br />
+              <InputNumber placeholder={t('width')} value={filters.width}
                 onChange={(val) => setFilters((f) => ({ ...f, width: val }))} style={{ width: 140 }} allowClear />
             </div>
             <div>
-              <Text type="secondary">Uzunlik (m)</Text><br />
-              <InputNumber placeholder="Uzunlik" value={filters.length}
+              <Text type="secondary">{t('length')}</Text><br />
+              <InputNumber placeholder={t('length')} value={filters.length}
                 onChange={(val) => setFilters((f) => ({ ...f, length: val }))} style={{ width: 140 }} allowClear />
             </div>
           </Space>
@@ -191,7 +194,7 @@ export default function Warehouse() {
       <Tabs defaultActiveKey="active" items={[
         {
           key: 'active',
-          label: `Ombor (${flatBundles.length})`,
+          label: `${t('warehousePage')} (${flatBundles.length})`,
           children: (
             <>
               {viewMode === 'table' ? (
@@ -199,7 +202,7 @@ export default function Warehouse() {
                   pagination={{ pageSize: 20 }} size="small"
                   summary={() => (
                     <Table.Summary.Row>
-                      <Table.Summary.Cell index={0} colSpan={7}><Text strong>Jami qoldiq m³:</Text></Table.Summary.Cell>
+                      <Table.Summary.Cell index={0} colSpan={7}><Text strong>{t('totalRemainingM3')}</Text></Table.Summary.Cell>
                       <Table.Summary.Cell index={7} colSpan={3}><Text strong>{formatM3(totalRemainingM3)}</Text></Table.Summary.Cell>
                     </Table.Summary.Row>
                   )} />
@@ -222,13 +225,13 @@ export default function Warehouse() {
                           </div>
                           <div className="warehouse-card-info">
                             <div className="warehouse-card-row">
-                              <Text type="secondary">Soni</Text>
-                              <Text strong>{b.count} dona</Text>
+                              <Text type="secondary">{t('count')}</Text>
+                              <Text strong>{b.count} {t('pieces')}</Text>
                             </div>
                             <div className="warehouse-card-row">
-                              <Text type="secondary">Qoldiq</Text>
+                              <Text type="secondary">{t('remaining')}</Text>
                               <Text strong type={b.remainingCount < b.count ? 'warning' : undefined}>
-                                {b.remainingCount} dona
+                                {b.remainingCount} {t('pieces')}
                               </Text>
                             </div>
                           </div>
@@ -251,7 +254,7 @@ export default function Warehouse() {
                           )}
                           <div className="warehouse-card-footer">
                             <div>
-                              <Text type="secondary" style={{ fontSize: 11 }}>m³/dona: {formatM3(b.m3PerPiece)}</Text>
+                              <Text type="secondary" style={{ fontSize: 11 }}>{t('unitM3')}: {formatM3(b.m3PerPiece)}</Text>
                             </div>
                             <span className="warehouse-card-m3">{formatM3(bundleM3)} m³</span>
                           </div>
@@ -259,7 +262,7 @@ export default function Warehouse() {
                             <div className="warehouse-card-sell">
                               <SellPopover bundle={b}>
                                 <Button type="primary" icon={<ShoppingCartOutlined />} block>
-                                  Sotish
+                                  {t('sell')}
                                 </Button>
                               </SellPopover>
                             </div>
@@ -268,22 +271,22 @@ export default function Warehouse() {
                       </Col>
                     );
                   })}
-                  {flatBundles.length === 0 && <Col span={24}><Text type="secondary">Omborda mahsulot yo'q</Text></Col>}
+                  {flatBundles.length === 0 && <Col span={24}><Text type="secondary">{t('noWarehouse')}</Text></Col>}
                 </Row>
               )}
               {flatBundles.length > 0 && (
                 <Card className="summary-card" style={{ marginTop: 16 }}>
                   <div className="summary-stats">
                     <div className="summary-stat">
-                      <span className="summary-stat-label">Vagonlar</span>
+                      <span className="summary-stat-label">{t('wagons')}</span>
                       <span className="summary-stat-value">{filteredGroups.length}</span>
                     </div>
                     <div className="summary-stat">
-                      <span className="summary-stat-label">Pozitsiyalar</span>
+                      <span className="summary-stat-label">{t('positions')}</span>
                       <span className="summary-stat-value">{totalBundles}</span>
                     </div>
                     <div className="summary-stat">
-                      <span className="summary-stat-label">Jami qoldiq</span>
+                      <span className="summary-stat-label">{t('totalRemaining')}</span>
                       <span className="summary-stat-value highlight">{formatM3(totalRemainingM3)} m³</span>
                     </div>
                   </div>
@@ -294,7 +297,7 @@ export default function Warehouse() {
         },
         {
           key: 'archive',
-          label: `Arxiv (${archivedBundles.length})`,
+          label: `${t('archive')} (${archivedBundles.length})`,
           children: viewMode === 'table' ? (
             <Table columns={archiveColumns} dataSource={archivedBundles} rowKey="_key"
               pagination={{ pageSize: 20 }} size="small" />
@@ -305,31 +308,31 @@ export default function Warehouse() {
                   <Card className="warehouse-card" style={{ opacity: 0.7 }}>
                     <div className="warehouse-card-top">
                       <Tag color="blue">{b.wagonCode}</Tag>
-                      <Tag color="default">Sotildi</Tag>
+                      <Tag color="default">{t('sold')}</Tag>
                     </div>
                     <div className="warehouse-card-dimension">
                       {b.thickness}mm<span> × </span>{b.width}mm<span> × </span>{b.length}m
                     </div>
                     <div className="warehouse-card-info">
                       <div className="warehouse-card-row">
-                        <Text type="secondary">Jami soni</Text>
-                        <Text strong>{b.count} dona</Text>
+                        <Text type="secondary">{t('count')}</Text>
+                        <Text strong>{b.count} {t('pieces')}</Text>
                       </div>
                       <div className="warehouse-card-row">
-                        <Text type="secondary">Tannarx/m³</Text>
+                        <Text type="secondary">{t('costPerM3')}</Text>
                         <Text strong>{b.costPricePerM3 > 0 ? formatMoney(b.costPricePerM3) : '—'}</Text>
                       </div>
                     </div>
                     <div className="warehouse-card-footer">
                       <div>
-                        <Text type="secondary" style={{ fontSize: 11 }}>m³/dona: {formatM3(b.m3PerPiece)}</Text>
+                        <Text type="secondary" style={{ fontSize: 11 }}>{t('unitM3')}: {formatM3(b.m3PerPiece)}</Text>
                       </div>
                       <span className="warehouse-card-m3">{formatM3((b.m3PerPiece || 0) * b.count)} m³</span>
                     </div>
                   </Card>
                 </Col>
               ))}
-              {archivedBundles.length === 0 && <Col span={24}><Text type="secondary">Arxivda mahsulot yo'q</Text></Col>}
+              {archivedBundles.length === 0 && <Col span={24}><Text type="secondary">{t('noArchive')}</Text></Col>}
             </Row>
           ),
         },
