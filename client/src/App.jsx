@@ -41,6 +41,17 @@ queryClient.prefetchQuery({
 const theme = {
   cssVar: true,
   hashed: false,
+  token: {
+    fontSize: 15,
+    fontSizeSM: 13,
+    fontSizeLG: 17,
+    fontSizeXL: 20,
+    fontSizeHeading1: 32,
+    fontSizeHeading2: 26,
+    fontSizeHeading3: 22,
+    fontSizeHeading4: 18,
+    fontSizeHeading5: 16,
+  },
 };
 
 export default function App() {
