@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const c = require('../controllers/transfersController');
 
+router.post('/rub-transfer', c.transferRub);
 router.post('/convert', c.convertCurrency);
 router.get('/conversions', c.getConversions);
 router.delete('/conversions/:id', c.deleteConversion);

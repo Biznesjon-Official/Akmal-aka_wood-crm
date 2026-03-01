@@ -81,7 +81,7 @@ exports.convertCurrency = async (req, res, next) => {
       category: 'boshqa',
       amount: amountRUB,
       currency: 'RUB',
-      account: 'RUB_account',
+      account: 'RUB_personal',
       description: `Konversiya: ${amountUSD} USD → ${amountRUB} RUB (kurs: ${effectiveRate.toFixed(2)})`,
       relatedConversion: conversion._id,
       date: date || new Date(),
@@ -121,7 +121,7 @@ exports.createTopUp = async (req, res, next) => {
       category: 'boshqa',
       amount,
       currency: currency || 'USD',
-      account: currency === 'RUB' ? 'RUB_account' : 'USD_account',
+      account: currency === 'RUB' ? 'RUB_personal' : 'USD_account',
       description: description || 'Hisobni to\'ldirish',
       relatedTopUp: topUp._id,
       date: date || new Date(),
@@ -148,5 +148,24 @@ exports.deleteTopUp = async (req, res, next) => {
 
     await topUp.deleteOne();
     res.json({ message: 'Deleted' });
+  } catch (err) { next(err); }
+};
+
+// Transfer: RUB_personal → RUB_russia
+exports.transferRub = async (req, res, next) => {
+  try {
+    const { amount, note, date } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Summani kiriting' });
+    const txDate = date || new Date();
+    const desc = note || 'RUB o\'tkazma: shaxsiy → rossiya';
+    await CashTransaction.create({
+      type: 'chiqim', category: 'boshqa', amount, currency: 'RUB',
+      account: 'RUB_personal', description: desc, date: txDate,
+    });
+    await CashTransaction.create({
+      type: 'kirim', category: 'boshqa', amount, currency: 'RUB',
+      account: 'RUB_russia', description: desc, date: txDate,
+    });
+    res.status(201).json({ ok: true, amount });
   } catch (err) { next(err); }
 };

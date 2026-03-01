@@ -20,7 +20,7 @@ async function syncWagonCashTransactions(wagonId, expenses, transportType) {
     category: mapCategory(e.description),
     amount: e.amount,
     currency: e.currency || 'USD',
-    account: (e.currency || 'USD') === 'RUB' ? 'RUB_account' : 'USD_account',
+    account: (e.currency || 'USD') === 'RUB' ? 'RUB_russia' : 'USD_account',
     description: `${prefix}: ${e.description}`,
     relatedWagon: wagonId,
   }));

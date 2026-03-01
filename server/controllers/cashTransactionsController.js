@@ -2,11 +2,12 @@ const CashTransaction = require('../models/CashTransaction');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const { type, category, source, from, to } = req.query;
+    const { type, category, source, from, to, account } = req.query;
     const filter = {};
     if (type) filter.type = type;
     if (category) filter.category = category;
     if (source) filter.source = source;
+    if (account) filter.account = account;
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
@@ -30,9 +31,12 @@ exports.create = async (req, res, next) => {
 exports.getBalance = async (req, res, next) => {
   try {
     const transactions = await CashTransaction.find().lean();
-    const balance = { USD: 0, RUB: 0 };
+    const balance = { USD: 0, RUB_personal: 0, RUB_russia: 0 };
     transactions.forEach(tx => {
-      const key = tx.currency === 'RUB' ? 'RUB' : 'USD';
+      let key;
+      if (tx.currency === 'USD') key = 'USD';
+      else if (tx.account === 'RUB_russia') key = 'RUB_russia';
+      else key = 'RUB_personal'; // RUB_account + RUB_personal → shaxsiy
       if (tx.type === 'kirim') balance[key] += tx.amount;
       else balance[key] -= tx.amount;
     });

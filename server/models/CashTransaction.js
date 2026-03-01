@@ -9,7 +9,7 @@ const cashTransactionSchema = new mongoose.Schema({
   },
   amount: { type: Number, required: true },
   currency: { type: String, enum: ['USD', 'RUB'], default: 'USD' },
-  account: { type: String, enum: ['USD_account', 'RUB_account'], required: true },
+  account: { type: String, enum: ['USD_account', 'RUB_account', 'RUB_personal', 'RUB_russia'], required: true },
   source: { type: mongoose.Schema.Types.ObjectId, ref: 'ExpenseSource' },
   description: String,
   relatedSale: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale' },

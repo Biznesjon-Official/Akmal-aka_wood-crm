@@ -70,6 +70,10 @@ export const updateTransfer = (id, data) =>
   api.put(`/transfers/${id}`, data).then((r) => r.data);
 export const convertCurrency = (data) =>
   api.post("/transfers/convert", data).then((r) => r.data);
+export const transferRub = (data) =>
+  api.post("/transfers/rub-transfer", data).then((r) => r.data);
+export const getRubTransactions = (account) =>
+  api.get("/cash-transactions", { params: { account } }).then((r) => r.data);
 export const getConversions = () =>
   api.get("/transfers/conversions").then((r) => r.data);
 export const deleteConversion = (id) =>

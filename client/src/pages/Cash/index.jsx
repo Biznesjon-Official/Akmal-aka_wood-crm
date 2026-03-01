@@ -38,7 +38,8 @@ const currencyOptions = [
 
 const accountOptions = [
   { value: 'USD_account', label: 'USD hisob' },
-  { value: 'RUB_account', label: 'RUB hisob' },
+  { value: 'RUB_personal', label: 'Shaxsiy RUB' },
+  { value: 'RUB_russia', label: 'Rossiya RUB' },
 ];
 
 export default function Cash() {
@@ -272,8 +273,12 @@ export default function Cash() {
             <span className="summary-stat-value highlight">{formatMoney(balance?.USD, 'USD')}</span>
           </div>
           <div className="summary-stat">
-            <span className="summary-stat-label">Balans (RUB)</span>
-            <span className="summary-stat-value">{formatMoney(balance?.RUB, 'RUB')}</span>
+            <span className="summary-stat-label">Shaxsiy RUB</span>
+            <span className="summary-stat-value">{(balance?.RUB_personal || 0).toLocaleString('ru')} ₽</span>
+          </div>
+          <div className="summary-stat">
+            <span className="summary-stat-label">Rossiya RUB</span>
+            <span className="summary-stat-value">{(balance?.RUB_russia || 0).toLocaleString('ru')} ₽</span>
           </div>
           <div className="summary-stat">
             <span className="summary-stat-label">Kirim (USD)</span>
