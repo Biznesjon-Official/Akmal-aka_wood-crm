@@ -59,9 +59,19 @@ function flattenExpenses(fixed, wood, custom) {
 }
 
 // ===================== EXPENSES TABLE (shared) =====================
-function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd, rate = 0 }) {
+function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd, rate = 0, totalM3 = 0 }) {
   const usdTotal = fixed.reduce((s, e) => s + (e.amount || 0), 0) + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
   const woodUsd = rate > 0 && wood.amount > 0 ? wood.amount / rate : null;
+  const pricePerM3 = totalM3 > 0 && wood.amount > 0 ? wood.amount / totalM3 : (wood.pricePerM3 || 0);
+
+  const handlePriceChange = (v) => {
+    const p = v || 0;
+    onWoodChange({ amount: totalM3 > 0 ? Math.round(p * totalM3) : (wood.amount || 0), pricePerM3: p });
+  };
+  const handleAmountChange = (v) => {
+    const a = v || 0;
+    onWoodChange({ amount: a, pricePerM3: totalM3 > 0 ? a / totalM3 : 0 });
+  };
 
   return (
     <>
@@ -69,7 +79,8 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
         <thead>
           <tr>
             <th style={thS}>Xarajat turi</th>
-            <th style={{ ...thS, width: 160, textAlign: 'right' }}>Summa</th>
+            <th style={{ ...thS, width: 130, textAlign: 'right' }}>Narx/m³</th>
+            <th style={{ ...thS, width: 130, textAlign: 'right' }}>Jami summa</th>
           </tr>
         </thead>
         <tbody>
@@ -85,13 +96,20 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
             </td>
             <td style={{ ...cellS, textAlign: 'right' }}>
               <InputNumber size="small" style={{ width: '100%' }} min={0}
-                value={wood.amount} onChange={(v) => onWoodChange(v || 0)} placeholder="0" />
+                value={pricePerM3 ? Math.round(pricePerM3) : undefined}
+                onChange={handlePriceChange} placeholder="0" />
+            </td>
+            <td style={{ ...cellS, textAlign: 'right' }}>
+              <InputNumber size="small" style={{ width: '100%' }} min={0}
+                value={wood.amount || undefined}
+                onChange={handleAmountChange} placeholder="0" />
             </td>
           </tr>
           {/* Fixed USD expenses */}
           {fixed.map((exp, idx) => (
             <tr key={exp.description} style={{ borderBottom: '1px solid #f0f0f0' }}>
               <td style={cellS}>{exp.description}</td>
+              <td style={{ ...cellS, textAlign: 'right' }} />
               <td style={{ ...cellS, textAlign: 'right' }}>
                 <InputNumber size="small" style={{ width: '100%' }} min={0}
                   value={exp.amount} onChange={(v) => onFixedChange(idx, v || 0)} placeholder="0" />
@@ -108,6 +126,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
                   <MinusCircleOutlined style={{ color: '#ff4d4f', cursor: 'pointer' }} onClick={() => onCustomRemove(idx)} />
                 </Space>
               </td>
+              <td style={{ ...cellS, textAlign: 'right' }} />
               <td style={{ ...cellS, textAlign: 'right' }}>
                 <InputNumber size="small" style={{ width: '100%' }} min={0}
                   value={exp.amount} onChange={(v) => onCustomChange(idx, 'amount', v || 0)} placeholder="0" />
@@ -116,6 +135,7 @@ function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCu
           ))}
           <tr style={{ background: '#f6ffed' }}>
             <td style={{ ...cellS, fontWeight: 600 }}>Jami USD</td>
+            <td />
             <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{usdTotal.toLocaleString('ru-RU')} USD</td>
           </tr>
         </tbody>
@@ -273,10 +293,14 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       <ExpensesEditor
         fixed={fixed} wood={wood} custom={custom} rate={globalRate}
         onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-        onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
+        onWoodChange={(v) => setWood((p) => ({ ...p, amount: v?.amount ?? v, pricePerM3: v?.pricePerM3 ?? p.pricePerM3 }))}
         onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
         onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
         onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
+        totalM3={bundles.reduce((s, b) => {
+          if (!b.thickness || !b.width || !b.length || !b.count) return s;
+          return s + ((b.thickness * b.width * b.length) / 1e6) * b.count;
+        }, 0)}
       />
 
       {/* Tannarx real-time preview */}
@@ -577,10 +601,11 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
           <ExpensesEditor
             fixed={fixed} wood={wood} custom={custom} rate={globalRate}
             onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-            onWoodChange={(v) => setWood((p) => ({ ...p, amount: v }))}
+            onWoodChange={(v) => setWood((p) => ({ ...p, amount: v?.amount ?? v, pricePerM3: v?.pricePerM3 ?? p.pricePerM3 }))}
             onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
             onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
             onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
+            totalM3={bundles.reduce((s, b) => s + (b.totalM3 || (b.thickness && b.width && b.length && b.count ? (b.thickness * b.width * b.length / 1e6) * b.count : 0)), 0)}
           />
 
           {/* Edit mode tannarx preview */}
