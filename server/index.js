@@ -33,6 +33,7 @@ app.use('/api/my-debts', require('./routes/myDebts'));
 app.use('/api/lent-debts', require('./routes/lentDebts'));
 app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/auth', require('./routes/auth'));
 
 // Production: serve client build
 if (process.env.NODE_ENV === 'production') {

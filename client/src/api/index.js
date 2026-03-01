@@ -85,6 +85,11 @@ export const createTopUp = (data) =>
 export const deleteTopUp = (id) =>
   api.delete(`/transfers/top-ups/${id}`).then((r) => r.data);
 
+// Auth
+export const checkAuthStatus = () => api.get("/auth/status").then((r) => r.data);
+export const verifyPin = (pin) => api.post("/auth/verify", { pin }).then((r) => r.data);
+export const setupPin = (pin, oldPin) => api.post("/auth/setup", { pin, oldPin }).then((r) => r.data);
+
 // Dashboard
 export const getDashboardStats = () =>
   api.get("/dashboard/stats").then((r) => r.data);
