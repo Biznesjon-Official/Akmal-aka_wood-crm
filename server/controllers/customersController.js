@@ -47,6 +47,7 @@ exports.getSales = async (req, res, next) => {
   try {
     const sales = await Sale.find({ customer: req.params.id })
       .populate('customer')
+      .populate('items.wagon', 'wagonCode woodBundles')
       .sort({ date: -1 })
       .lean();
     res.json(sales);

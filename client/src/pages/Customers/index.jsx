@@ -141,28 +141,69 @@ const Customers = () => {
     },
   ];
 
-  // Expandable: payment list per sale
+  // Expandable: items (wood) + payments per sale
   const expandedRowRender = (sale) => {
     const payments = paymentsBySale[sale._id] || [];
-    const rows = [];
+    const paymentRows = [];
     if (sale.paidAmount > 0) {
-      rows.push({ _id: 'initial', date: sale.date || sale.createdAt, amount: sale.paidAmount, note: 'Dastlabki to\'lov' });
+      paymentRows.push({ _id: 'initial', date: sale.date || sale.createdAt, amount: sale.paidAmount, note: 'Dastlabki to\'lov' });
     }
-    payments.forEach((p) => rows.push({ _id: p._id, date: p.date, amount: p.amount, note: p.note || '' }));
-    if (rows.length === 0) return <Text type="secondary" style={{ paddingLeft: 24 }}>To'lov yo'q</Text>;
+    payments.forEach((p) => paymentRows.push({ _id: p._id, date: p.date, amount: p.amount, note: p.note || '' }));
+
+    const items = sale.items || [];
     return (
-      <Table
-        rowKey="_id"
-        dataSource={rows}
-        size="small"
-        pagination={false}
-        style={{ margin: '0 24px' }}
-        columns={[
-          { title: 'Sana', dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
-          { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v) => formatMoney(v) },
-          { title: 'Izoh', dataIndex: 'note', key: 'note' },
-        ]}
-      />
+      <div style={{ padding: '0 24px 8px' }}>
+        {/* Wood items */}
+        <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 12, color: '#555' }}>Yog'ochlar:</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 10, fontSize: 12 }}>
+          <thead>
+            <tr style={{ background: '#fafafa' }}>
+              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>Vagon</th>
+              <th style={{ padding: '4px 8px', textAlign: 'left', fontWeight: 500 }}>O'lcham</th>
+              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>Soni</th>
+              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>m³/dona</th>
+              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>Jami m³</th>
+              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>Narx/dona</th>
+              <th style={{ padding: '4px 8px', textAlign: 'right', fontWeight: 500 }}>Summa</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, i) => {
+              const bundle = item.wagon?.woodBundles?.[item.bundleIndex];
+              const size = bundle ? `${bundle.thickness}×${bundle.width}mm × ${bundle.length}m` : '—';
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '4px 8px' }}><Text strong>{item.wagon?.wagonCode || '—'}</Text></td>
+                  <td style={{ padding: '4px 8px' }}>{size}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.quantity} dona</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.m3PerPiece?.toFixed(4)} m³</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>{item.totalM3?.toFixed(4)} m³</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}>{formatMoney(item.pricePerPiece)}</td>
+                  <td style={{ padding: '4px 8px', textAlign: 'right' }}><Text strong>{formatMoney(item.totalAmount)}</Text></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {/* Payments */}
+        {paymentRows.length > 0 && (
+          <>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 12, color: '#555' }}>To'lovlar:</div>
+            <Table
+              rowKey="_id"
+              dataSource={paymentRows}
+              size="small"
+              pagination={false}
+              columns={[
+                { title: 'Sana', dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
+                { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v) => formatMoney(v) },
+                { title: 'Izoh', dataIndex: 'note', key: 'note' },
+              ]}
+            />
+          </>
+        )}
+      </div>
     );
   };
 
