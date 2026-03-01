@@ -22,7 +22,7 @@ function CustomerDebts() {
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
-  const [viewMode, setViewMode] = useState('table');
+  const [viewMode, setViewMode] = useState('card');
 
   const { data: salesRaw, isLoading: salesLoading } = useQuery({
     queryKey: ['sales'],
