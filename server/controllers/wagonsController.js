@@ -103,6 +103,19 @@ exports.allBundlesToWarehouse = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.addAstatkaBundle = async (req, res, next) => {
+  try {
+    let wagon = await Wagon.findOne({ wagonCode: 'ASTATKA' });
+    if (!wagon) {
+      wagon = new Wagon({ wagonCode: 'ASTATKA', type: 'mashina', status: 'omborda' });
+    }
+    const { thickness, width, length, count } = req.body;
+    wagon.woodBundles.push({ thickness, width, length, count, location: 'ombor' });
+    await wagon.save();
+    res.json(wagon);
+  } catch (err) { next(err); }
+};
+
 exports.updateExpenses = async (req, res, next) => {
   try {
     const wagon = await Wagon.findById(req.params.id);

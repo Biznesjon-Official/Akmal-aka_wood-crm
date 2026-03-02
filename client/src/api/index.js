@@ -14,6 +14,8 @@ export const updateWagon = (id, data) =>
   api.put(`/wagons/${id}`, data).then((r) => r.data);
 export const deleteWagon = (id) =>
   api.delete(`/wagons/${id}`).then((r) => r.data);
+export const addAstatkaBundle = (data) =>
+  api.post('/wagons/astatka-bundle', data).then((r) => r.data);
 export const bundleToWarehouse = (id, index) =>
   api.put(`/wagons/${id}/bundles/${index}/to-warehouse`).then((r) => r.data);
 export const updateExpenses = (id, expenses) =>

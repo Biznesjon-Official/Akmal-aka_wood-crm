@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Table, InputNumber, Card, Typography, Space, Spin, Tag, Row, Col, Segmented, Progress, Button, Popover, Tabs, message } from 'antd';
-import { AppstoreOutlined, BarsOutlined, WarningOutlined, ShoppingCartOutlined } from '@ant-design/icons';
-import { useQuery } from '@tanstack/react-query';
-import { getWagons } from '../../api';
+import { Table, InputNumber, Card, Typography, Space, Spin, Tag, Row, Col, Segmented, Progress, Button, Popover, Tabs, message, Modal, Form } from 'antd';
+import { AppstoreOutlined, BarsOutlined, WarningOutlined, ShoppingCartOutlined, PlusOutlined } from '@ant-design/icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getWagons, addAstatkaBundle } from '../../api';
 import { formatM3, formatMoney, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -56,8 +56,22 @@ function SellPopover({ bundle, children }) {
 
 export default function Warehouse() {
   const { t } = useLanguage();
+  const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ thickness: null, width: null, length: null });
   const [viewMode, setViewMode] = useState('table');
+  const [astatkaOpen, setAstatkaOpen] = useState(false);
+  const [astatkaForm] = Form.useForm();
+
+  const astatkaMutation = useMutation({
+    mutationFn: addAstatkaBundle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wagons'] });
+      message.success("Astatka qo'shildi");
+      setAstatkaOpen(false);
+      astatkaForm.resetFields();
+    },
+    onError: () => message.error(t('error')),
+  });
 
   const { data: wagons, isLoading } = useQuery({
     queryKey: ['wagons'],
@@ -183,13 +197,44 @@ export default function Warehouse() {
                 onChange={(val) => setFilters((f) => ({ ...f, length: val }))} style={{ width: 140 }} allowClear />
             </div>
           </Space>
-          <Segmented value={viewMode} onChange={setViewMode}
-            options={[
-              { value: 'table', icon: <BarsOutlined /> },
-              { value: 'card', icon: <AppstoreOutlined /> },
-            ]} />
+          <Space>
+            <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
+              Astatka qo'shish
+            </Button>
+            <Segmented value={viewMode} onChange={setViewMode}
+              options={[
+                { value: 'table', icon: <BarsOutlined /> },
+                { value: 'card', icon: <AppstoreOutlined /> },
+              ]} />
+          </Space>
         </div>
       </Card>
+
+      <Modal
+        title="Astatka qo'shish"
+        open={astatkaOpen}
+        onOk={() => astatkaForm.submit()}
+        onCancel={() => { setAstatkaOpen(false); astatkaForm.resetFields(); }}
+        confirmLoading={astatkaMutation.isPending}
+        okText={t('save')}
+        cancelText={t('cancel')}
+      >
+        <Form form={astatkaForm} layout="vertical"
+          onFinish={(values) => astatkaMutation.mutate(values)}>
+          <Form.Item name="thickness" label={t('thickness')} rules={[{ required: true, message: 'Kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="25" addonAfter="mm" />
+          </Form.Item>
+          <Form.Item name="width" label={t('width')} rules={[{ required: true, message: 'Kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="100" addonAfter="mm" />
+          </Form.Item>
+          <Form.Item name="length" label={t('length')} rules={[{ required: true, message: 'Kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.1} step={0.1} placeholder="6" addonAfter="m" />
+          </Form.Item>
+          <Form.Item name="count" label={t('count')} rules={[{ required: true, message: 'Kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={1} placeholder="100" addonAfter={t('pieces')} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Tabs defaultActiveKey="active" items={[
         {

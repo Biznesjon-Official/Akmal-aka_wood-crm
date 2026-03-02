@@ -22,7 +22,9 @@ function CustomerDebts() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
+  const [astatkaForm] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
+  const [astatkaOpen, setAstatkaOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
   const [viewMode, setViewMode] = useState('card');
 
@@ -52,6 +54,19 @@ function CustomerDebts() {
     onError: () => {
       message.error(t('paymentError'));
     },
+  });
+
+  const astatkaMutation = useMutation({
+    mutationFn: createLentDebt,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lent-debts'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      message.success(t('debtAdded'));
+      setAstatkaOpen(false);
+      astatkaForm.resetFields();
+    },
+    onError: () => message.error(t('error')),
   });
 
   const { customerDebts, totalDebtUSD, totalDebtRUB } = useMemo(() => {
@@ -181,6 +196,9 @@ function CustomerDebts() {
             { value: 'card', icon: <AppstoreOutlined /> },
             { value: 'table', icon: <BarsOutlined /> },
           ]} />
+        <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
+          Astatka qo'shish
+        </Button>
       </div>
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
@@ -245,6 +263,37 @@ function CustomerDebts() {
           }}
         />
       )}
+
+      {/* Astatka modal */}
+      <Modal
+        title="Astatka qo'shish"
+        open={astatkaOpen}
+        onOk={() => astatkaForm.submit()}
+        onCancel={() => { setAstatkaOpen(false); astatkaForm.resetFields(); }}
+        confirmLoading={astatkaMutation.isPending}
+        okText={t('save')}
+        cancelText={t('cancel')}
+      >
+        <Form form={astatkaForm} layout="vertical"
+          initialValues={{ currency: 'USD', date: dayjs() }}
+          onFinish={(values) => astatkaMutation.mutate({ ...values, date: values.date?.toISOString() })}>
+          <Form.Item name="debtor" label={t('customer')} rules={[{ required: true, message: 'Ismni kiriting' }]}>
+            <Input placeholder="Mijoz ismi" />
+          </Form.Item>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="currency" label={t('currency')}>
+            <Select options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+          </Form.Item>
+          <Form.Item name="date" label={t('date')}>
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="description" label={t('note')}>
+            <Input placeholder={t('note')} />
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={t('makePayment')}

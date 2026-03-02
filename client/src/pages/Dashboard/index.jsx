@@ -64,7 +64,7 @@ export default function Dashboard() {
   }
 
   const {
-    totalSales = {}, totalDebt = {}, balance = {},
+    totalDebt = {}, balance = {},
     wagonCounts = {}, totalWagons = 0,
     deliveryStats = {}, thisMonth = {}, monthCash = {},
     recentSales = [], incomingWagons = [],
