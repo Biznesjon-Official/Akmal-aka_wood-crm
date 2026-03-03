@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, message, Popconfirm, Space, Drawer, Tag, Row, Col, Card, Segmented, Typography, Descriptions } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, message, Popconfirm, Space, Drawer, Tag, Row, Col, Card, Segmented, Typography, Descriptions } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, DollarOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments } from '../../api';
+import dayjs from 'dayjs';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments, createPayment, deletePayment, createLentDebt } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
@@ -18,6 +19,11 @@ const Customers = () => {
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payingSale, setPayingSale] = useState(null);
+  const [astatkaOpen, setAstatkaOpen] = useState(false);
+  const [payForm] = Form.useForm();
+  const [astatkaForm] = Form.useForm();
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
@@ -81,6 +87,68 @@ const Customers = () => {
     },
     onError: () => message.error(t('error')),
   });
+
+  const payMutation = useMutation({
+    mutationFn: createPayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-sales', selectedCustomer?._id] });
+      queryClient.invalidateQueries({ queryKey: ['customer-payments', selectedCustomer?._id] });
+      queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      message.success(t('paymentAdded'));
+      setPayModalOpen(false);
+      setPayingSale(null);
+      payForm.resetFields();
+    },
+    onError: () => message.error(t('error')),
+  });
+
+  const deletePayMutation = useMutation({
+    mutationFn: deletePayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-sales', selectedCustomer?._id] });
+      queryClient.invalidateQueries({ queryKey: ['customer-payments', selectedCustomer?._id] });
+      queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      message.success(t('deleted'));
+    },
+    onError: () => message.error(t('error')),
+  });
+
+  const astatkaMutation = useMutation({
+    mutationFn: createLentDebt,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lent-debts'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      message.success(t('debtAdded'));
+      setAstatkaOpen(false);
+      astatkaForm.resetFields();
+    },
+    onError: () => message.error(t('error')),
+  });
+
+  const handlePaySale = (sale) => {
+    setPayingSale(sale);
+    payForm.setFieldsValue({ amount: null, currency: sale.currency || 'USD', date: dayjs(), note: '' });
+    setPayModalOpen(true);
+  };
+
+  const handlePaySubmit = async () => {
+    try {
+      const values = await payForm.validateFields();
+      payMutation.mutate({
+        sale: payingSale._id,
+        customer: payingSale.customer?._id || payingSale.customer || selectedCustomer?._id,
+        amount: values.amount,
+        currency: values.currency,
+        date: values.date?.toISOString(),
+        note: values.note,
+      });
+    } catch { /* validation */ }
+  };
 
   const openCreate = () => {
     setEditingCustomer(null);
@@ -201,6 +269,14 @@ const Customers = () => {
                 { title: t('date'), dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
                 { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v) => formatMoney(v) },
                 { title: t('note'), dataIndex: 'note', key: 'note' },
+                {
+                  title: '', key: 'del', width: 48,
+                  render: (_, p) => p._id === 'initial' ? null : (
+                    <Popconfirm title={t('deleteConfirm')} onConfirm={() => deletePayMutation.mutate(p._id)}>
+                      <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  ),
+                },
               ]}
             />
           </>
@@ -229,6 +305,26 @@ const Customers = () => {
         return debt > 0
           ? <Text type="danger">{formatMoney(debt)}</Text>
           : <Tag color="green">{t('full')}</Tag>;
+      },
+    },
+    {
+      title: '',
+      key: 'pay',
+      width: 80,
+      render: (_, sale) => {
+        const extra = (paymentsBySale[sale._id] || []).reduce((s, p) => s + (p.amount || 0), 0);
+        const debt = (sale.totalAmount || 0) - (sale.paidAmount || 0) - extra;
+        if (debt <= 0) return null;
+        return (
+          <Button
+            type="primary"
+            size="small"
+            icon={<DollarOutlined />}
+            onClick={() => handlePaySale({ ...sale, debt })}
+          >
+            {t('pay')}
+          </Button>
+        );
       },
     },
   ];
@@ -274,9 +370,14 @@ const Customers = () => {
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
         </Space>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          {t('addCustomer')}
-        </Button>
+        <Space>
+          <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
+            Astatka qo'shish
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            {t('addCustomer')}
+          </Button>
+        </Space>
       </div>
 
       <Card className="summary-card" style={{ marginBottom: 16 }}>
@@ -375,6 +476,72 @@ const Customers = () => {
           </>
         )}
       </Drawer>
+      {/* Pay modal */}
+      <Modal
+        title={t('makePayment')}
+        open={payModalOpen}
+        onOk={handlePaySubmit}
+        onCancel={() => { setPayModalOpen(false); setPayingSale(null); }}
+        confirmLoading={payMutation.isPending}
+        okText={t('save')}
+        cancelText={t('cancel')}
+      >
+        {payingSale && (
+          <div style={{ marginBottom: 16 }}>
+            <Text type="secondary">
+              {t('debt')}: {formatMoney(payingSale.debt, payingSale.currency)}
+            </Text>
+          </div>
+        )}
+        <Form form={payForm} layout="vertical">
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={1} max={payingSale?.debt} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="currency" label={t('currency')} rules={[{ required: true }]}>
+            <Select options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+          </Form.Item>
+          <Form.Item name="date" label={t('date')} rules={[{ required: true, message: 'Sanani tanlang' }]}>
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="note" label={t('note')}>
+            <Input placeholder={t('note')} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Astatka modal */}
+      <Modal
+        title="Astatka qo'shish"
+        open={astatkaOpen}
+        onOk={() => astatkaForm.submit()}
+        onCancel={() => { setAstatkaOpen(false); astatkaForm.resetFields(); }}
+        confirmLoading={astatkaMutation.isPending}
+        okText={t('save')}
+        cancelText={t('cancel')}
+      >
+        <Form
+          form={astatkaForm}
+          layout="vertical"
+          initialValues={{ currency: 'USD', date: dayjs() }}
+          onFinish={(values) => astatkaMutation.mutate({ ...values, date: values.date?.toISOString() })}
+        >
+          <Form.Item name="debtor" label={t('customer')} rules={[{ required: true, message: 'Ismni kiriting' }]}>
+            <Input placeholder="Mijoz ismi" />
+          </Form.Item>
+          <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="currency" label={t('currency')}>
+            <Select options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+          </Form.Item>
+          <Form.Item name="date" label={t('date')}>
+            <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
+          </Form.Item>
+          <Form.Item name="description" label={t('note')}>
+            <Input placeholder={t('note')} />
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };
