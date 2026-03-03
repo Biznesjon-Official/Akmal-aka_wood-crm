@@ -20,6 +20,16 @@ exports.getAll = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.remove = async (req, res, next) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+    if (!payment) return res.status(404).json({ message: 'Topilmadi' });
+    await CashTransaction.deleteMany({ relatedSale: payment.sale, category: 'qarz_tolovi' });
+    await payment.deleteOne();
+    res.json({ message: 'Deleted' });
+  } catch (err) { next(err); }
+};
+
 exports.create = async (req, res, next) => {
   try {
     const payment = await Payment.create(req.body);

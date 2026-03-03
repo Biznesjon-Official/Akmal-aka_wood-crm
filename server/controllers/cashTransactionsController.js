@@ -44,6 +44,15 @@ exports.getBalance = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.remove = async (req, res, next) => {
+  try {
+    const tx = await CashTransaction.findById(req.params.id);
+    if (!tx) return res.status(404).json({ message: 'Topilmadi' });
+    await tx.deleteOne();
+    res.json({ message: 'Deleted' });
+  } catch (err) { next(err); }
+};
+
 exports.getReport = async (req, res, next) => {
   try {
     const { from, to } = req.query;

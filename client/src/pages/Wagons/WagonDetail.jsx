@@ -7,7 +7,7 @@ import {
 } from 'antd';
 import { ArrowLeftOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getWagon, updateWagon, bundleToWarehouse, updateExpenses } from '../../api';
+import { getWagon, updateWagon, bundleToWarehouse } from '../../api';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors } from '../../utils/format';
 
 const { Title } = Typography;
@@ -21,7 +21,6 @@ export default function WagonDetail() {
   const [bundleOpen, setBundleOpen] = useState(false);
   const [editForm] = Form.useForm();
   const [bundleForm] = Form.useForm();
-  const [expenseForm] = Form.useForm();
 
   const { data: wagon, isLoading } = useQuery({
     queryKey: ['wagon', id],
@@ -51,14 +50,6 @@ export default function WagonDetail() {
     },
   });
 
-  // Update expenses
-  const expenseMutation = useMutation({
-    mutationFn: (expenses) => updateExpenses(id, expenses),
-    onSuccess: () => {
-      invalidate();
-      message.success('Xarajat saqlandi');
-    },
-  });
 
   // Handlers
   const handleEdit = (values) => {
@@ -85,31 +76,9 @@ export default function WagonDetail() {
     bundleForm.resetFields();
   };
 
-  const handleAddExpense = (values) => {
-    const expenses = [...(wagon.expenses || []), values];
-    expenseMutation.mutate(expenses);
-    expenseForm.resetFields();
-  };
-
-  const handleDeleteExpense = (index) => {
-    const expenses = (wagon.expenses || []).filter((_, i) => i !== index);
-    expenseMutation.mutate(expenses);
-  };
-
-  // Columns
   const expenseColumns = [
     { title: 'Tavsif', dataIndex: 'description', key: 'description' },
-    { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
-    { title: 'Valyuta', dataIndex: 'currency', key: 'currency' },
-    {
-      title: 'Amal',
-      key: 'action',
-      render: (_, __, index) => (
-        <Popconfirm title="O'chirishni tasdiqlaysizmi?" onConfirm={() => handleDeleteExpense(index)}>
-          <Button type="link" danger size="small">O'chirish</Button>
-        </Popconfirm>
-      ),
-    },
+    { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v) => formatMoney(v, 'RUB') },
   ];
 
   const bundleColumns = [
@@ -163,34 +132,17 @@ export default function WagonDetail() {
         <Descriptions.Item label="Tannarx/m³">{formatMoney(wagon.costPricePerM3)}</Descriptions.Item>
       </Descriptions>
 
-      {/* Xarajatlar */}
+      {/* Xarajatlar (faqat ko'rish — kassa sahifasidan chiqim orqali qo'shiladi) */}
       <Divider />
-      <Title level={4}>Xarajatlar</Title>
+      <Title level={4}>RUB Xarajatlar</Title>
       <Table
         columns={expenseColumns}
-        dataSource={(wagon.expenses || []).map((e, i) => ({ ...e, key: i }))}
+        dataSource={(wagon.expenses || []).filter(e => e.currency === 'RUB').map((e, i) => ({ ...e, key: i }))}
         pagination={false}
         size="small"
-        style={{ marginBottom: 16 }}
+        style={{ marginBottom: 24 }}
+        locale={{ emptyText: 'Xarajat yo\'q. Kassadan chiqim qo\'shing.' }}
       />
-      <Form form={expenseForm} layout="inline" onFinish={handleAddExpense} style={{ marginBottom: 24 }}>
-        <Form.Item name="description" rules={[{ required: true, message: 'Tavsif' }]}>
-          <Input placeholder="Tavsif" />
-        </Form.Item>
-        <Form.Item name="amount" rules={[{ required: true, message: 'Summa' }]}>
-          <InputNumber placeholder="Summa" min={0} style={{ width: 140 }} />
-        </Form.Item>
-        <Form.Item name="currency" initialValue="USD">
-          <Select style={{ width: 100 }} options={[
-            { value: 'USD', label: 'USD' },
-            { value: 'UZS', label: 'UZS' },
-            { value: 'KZT', label: 'KZT' },
-          ]} />
-        </Form.Item>
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={expenseMutation.isPending}>Qo'shish</Button>
-        </Form.Item>
-      </Form>
 
       {/* Yog'och to'plamlari */}
       <Divider />

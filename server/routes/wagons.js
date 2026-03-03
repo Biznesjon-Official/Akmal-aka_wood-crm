@@ -11,5 +11,6 @@ router.delete('/:id', c.remove);
 router.put('/:id/to-warehouse', c.allBundlesToWarehouse);
 router.put('/:id/bundles/:index/to-warehouse', c.bundleToWarehouse);
 router.put('/:id/expenses', c.updateExpenses);
+router.post('/:id/add-expense', c.addExpense);
 
 module.exports = router;

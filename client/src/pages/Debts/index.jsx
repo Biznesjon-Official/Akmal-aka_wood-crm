@@ -8,7 +8,7 @@ import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleO
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
-  getSales, getPayments, createPayment,
+  getSales, getPayments, createPayment, deletePayment,
   getMyDebts, createMyDebt, addMyDebtPayment, deleteMyDebt,
   getLentDebts, createLentDebt, addLentDebtPayment, deleteLentDebt,
 } from '../../api';
@@ -54,6 +54,18 @@ function CustomerDebts() {
     onError: () => {
       message.error(t('paymentError'));
     },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: deletePayment,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      message.success(t('deleted'));
+    },
+    onError: () => message.error(t('error')),
   });
 
   const astatkaMutation = useMutation({
@@ -251,15 +263,36 @@ function CustomerDebts() {
           rowKey="customerId"
           pagination={{ pageSize: 20 }}
           expandable={{
-            expandedRowRender: (record) => (
-              <Table
-                columns={saleColumns}
-                dataSource={record.sales}
-                rowKey="_id"
-                pagination={false}
-                size="small"
-              />
-            ),
+            expandedRowRender: (record) => {
+              const payments = Array.isArray(paymentsRaw) ? paymentsRaw : paymentsRaw?.data || [];
+              const payColumns = [
+                { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                { title: t('amount'), key: 'amount', render: (_, p) => <Text style={{ color: '#389e0d' }} strong>{formatMoney(p.amount, p.currency)}</Text> },
+                { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+                {
+                  title: '', key: 'del', width: 48,
+                  render: (_, p) => (
+                    <Popconfirm title={t('deleteConfirm')} onConfirm={() => deletePaymentMutation.mutate(p._id)}>
+                      <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
+                  ),
+                },
+              ];
+              return record.sales.map((sale) => {
+                const salePays = payments.filter(p => (p.sale?._id || p.sale) === sale._id);
+                return (
+                  <div key={sale._id} style={{ marginBottom: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text type="secondary">{formatDate(sale.date)} — {t('total')}: {formatMoney(sale.totalAmount, sale.currency)}, {t('debt')}: <Text type="danger">{formatMoney(sale.debt, sale.currency)}</Text></Text>
+                      <Button type="primary" size="small" onClick={() => handlePayment(sale)}>{t('payBtn')}</Button>
+                    </div>
+                    {salePays.length > 0 && (
+                      <Table columns={payColumns} dataSource={salePays} rowKey="_id" pagination={false} size="small" style={{ marginLeft: 16 }} />
+                    )}
+                  </div>
+                );
+              });
+            },
           }}
         />
       )}

@@ -10,7 +10,7 @@ import {
 import dayjs from 'dayjs';
 import {
   getDeliveries, createDelivery, updateDelivery, deleteDelivery,
-  markDelivered, addDeliveryPayment, getCustomers, createCustomer,
+  markDelivered, addDeliveryPayment, deleteDeliveryPayment, getCustomers, createCustomer,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
@@ -86,7 +86,13 @@ export default function Deliveries() {
 
   const payMut = useMutation({
     mutationFn: ({ id, data }) => addDeliveryPayment(id, data),
-    onSuccess: () => { invalidate(); message.success(t('paymentAdded2')); setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); },
+    onSuccess: (updated) => { invalidate(); message.success(t('paymentAdded2')); setPayTarget(updated); payForm.resetFields(); },
+    onError: () => message.error(t('error')),
+  });
+
+  const deletePayMut = useMutation({
+    mutationFn: ({ id, paymentId }) => deleteDeliveryPayment(id, paymentId),
+    onSuccess: (updated) => { invalidate(); message.success(t('deleted')); setPayTarget(updated); },
     onError: () => message.error(t('error')),
   });
 
@@ -516,13 +522,34 @@ export default function Deliveries() {
         cancelText={t('cancel')}
       >
         {payTarget && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f6ffed', borderRadius: 8 }}>
-            <Row gutter={16}>
-              <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
-              <Col span={8}><Text type="secondary">{t('paid')}:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
-              <Col span={8}><Text type="secondary">{t('remaining')}:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
-            </Row>
-          </div>
+          <>
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#f6ffed', borderRadius: 8 }}>
+              <Row gutter={16}>
+                <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('paid')}:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('remaining')}:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
+              </Row>
+            </div>
+            {payTarget.payments?.length > 0 && (
+              <Table
+                size="small"
+                style={{ marginBottom: 16 }}
+                pagination={false}
+                dataSource={[...payTarget.payments].reverse()}
+                rowKey="_id"
+                columns={[
+                  { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                  { title: 'USD', dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#389e0d' }}>{formatMoney(v, 'USD')}</Text> },
+                  { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+                  { title: '', key: 'del', width: 40, render: (_, p) => (
+                    <Popconfirm title={t('deleteConfirm')} onConfirm={() => deletePayMut.mutate({ id: payTarget._id, paymentId: p._id })}>
+                      <Button size="small" type="text" danger icon={<DeleteOutlined />} loading={deletePayMut.isPending} />
+                    </Popconfirm>
+                  )},
+                ]}
+              />
+            )}
+          </>
         )}
         <Form form={payForm} layout="vertical" onFinish={(values) => {
           payMut.mutate({ id: payTarget._id, data: { ...values, date: values.date?.toISOString() } });

@@ -22,6 +22,8 @@ export const updateExpenses = (id, expenses) =>
   api.put(`/wagons/${id}/expenses`, { expenses }).then((r) => r.data);
 export const allBundlesToWarehouse = (id) =>
   api.put(`/wagons/${id}/to-warehouse`).then((r) => r.data);
+export const addWagonExpense = (id, data) =>
+  api.post(`/wagons/${id}/add-expense`, data).then((r) => r.data);
 
 // Customers
 export const getCustomers = () => api.get("/customers").then((r) => r.data);
@@ -51,6 +53,8 @@ export const getPayments = (params) =>
   api.get("/payments", { params }).then((r) => r.data);
 export const createPayment = (data) =>
   api.post("/payments", data).then((r) => r.data);
+export const deletePayment = (id) =>
+  api.delete(`/payments/${id}`).then((r) => r.data);
 
 // Cash Transactions
 export const getCashTransactions = (params) =>
@@ -61,6 +65,8 @@ export const getCashBalance = () =>
   api.get("/cash-transactions/balance").then((r) => r.data);
 export const getCashReport = (params) =>
   api.get("/cash-transactions/report", { params }).then((r) => r.data);
+export const deleteCashTransaction = (id) =>
+  api.delete(`/cash-transactions/${id}`).then((r) => r.data);
 
 // Transfers
 export const getTransfers = () => api.get("/transfers").then((r) => r.data);
@@ -139,6 +145,8 @@ export const markDelivered = (id) =>
   api.put(`/deliveries/${id}/deliver`).then((r) => r.data);
 export const addDeliveryPayment = (id, data) =>
   api.post(`/deliveries/${id}/payment`, data).then((r) => r.data);
+export const deleteDeliveryPayment = (id, paymentId) =>
+  api.delete(`/deliveries/${id}/payments/${paymentId}`).then((r) => r.data);
 
 // Suppliers
 export const getSuppliers = () => api.get("/suppliers").then((r) => r.data);

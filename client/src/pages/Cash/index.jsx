@@ -7,9 +7,9 @@ import {
 import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, TeamOutlined, DollarOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  getCashTransactions, createCashTransaction, getCashBalance,
+  getCashTransactions, createCashTransaction, deleteCashTransaction, getCashBalance,
   getExpenseSources, createExpenseSource, updateExpenseSource, deleteExpenseSource,
-  getWagons, getWagonProfitSummary,
+  getWagons, getWagonProfitSummary, addWagonExpense,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
@@ -98,6 +98,12 @@ export default function Cash() {
     onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteCashTransaction,
+    onSuccess: () => { invalidateCash(); message.success(t('deleted')); },
+    onError: () => message.error(t('error')),
+  });
+
   const createSourceMutation = useMutation({
     mutationFn: createExpenseSource,
     onSuccess: () => {
@@ -128,6 +134,8 @@ export default function Cash() {
     onError: (err) => message.error(err?.response?.data?.message || t('error')),
   });
 
+  const chiqimCurrency = Form.useWatch('currency', form);
+
   const handleCreate = async (values) => {
     const payload = {
       type: modalType,
@@ -146,6 +154,16 @@ export default function Cash() {
 
     try {
       await createMutation.mutateAsync(payload);
+
+      // If chiqim + RUB + wagon selected → add to wagon expenses for tannarx
+      if (modalType === 'chiqim' && values.currency === 'RUB' && values.wagonId) {
+        await addWagonExpense(values.wagonId, {
+          description: values.description || '',
+          amount: values.amount,
+        });
+        queryClient.invalidateQueries({ queryKey: ['wagons'] });
+        queryClient.invalidateQueries({ queryKey: ['wagon', values.wagonId] });
+      }
 
       // Partner share on kirim
       if (modalType === 'kirim' && partnerEnabled && values.partnerAmount > 0) {
@@ -258,6 +276,14 @@ export default function Cash() {
       render: (acc) => accountOptions.find((a) => a.value === acc)?.label || acc,
     },
     { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+    {
+      title: '', key: 'del', width: 48,
+      render: (_, record) => (
+        <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMutation.mutate(record._id)}>
+          <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      ),
+    },
   ];
 
   // Compute summary stats from all transactions (unfiltered would be ideal, but use filtered as proxy)
@@ -359,6 +385,11 @@ export default function Cash() {
                   <Text style={{ fontSize: 12 }}>{accountOptions.find((a) => a.value === tx.account)?.label || tx.account}</Text>
                 </div>
                 {tx.description && <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }} ellipsis>{tx.description}</Text>}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                  <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMutation.mutate(tx._id)}>
+                    <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                  </Popconfirm>
+                </div>
               </Card>
             </Col>
           ))}
@@ -381,9 +412,24 @@ export default function Cash() {
               <Select options={kirimSourceOptions} placeholder={t('selectSource')} />
             </Form.Item>
           ) : (
-            <Form.Item name="source" label={t('expenseSource')} rules={[{ required: true, message: t('selectSource') }]}>
-              <Select options={chiqimSourceOptions} placeholder={t('selectSource')} />
-            </Form.Item>
+            <>
+              <Form.Item name="source" label={t('expenseSource')} rules={[{ required: true, message: t('selectSource') }]}>
+                <Select options={chiqimSourceOptions} placeholder={t('selectSource')} />
+              </Form.Item>
+              {chiqimCurrency === 'RUB' && (
+                <Form.Item name="wagonId" label="Vagon (tannarxga qo'shiladi)">
+                  <Select
+                    allowClear
+                    placeholder="Vagonni tanlang (ixtiyoriy)"
+                    options={wagons
+                      .filter(w => w.status !== 'sotildi')
+                      .map(w => ({ value: w._id, label: `${w.wagonCode} — ${w.status}` }))}
+                    showSearch
+                    filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+                  />
+                </Form.Item>
+              )}
+            </>
           )}
           <Form.Item name="amount" label={t('amount')} rules={[{ required: true, message: t('enterAmount') }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />

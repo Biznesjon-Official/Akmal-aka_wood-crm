@@ -7,9 +7,8 @@ exports.getAll = async (req, res, next) => {
     if (req.query.status) filter.status = req.query.status;
     const deliveries = await Delivery.find(filter)
       .populate('customer', 'name phone')
-      .sort({ sentDate: -1 })
-      .lean({ virtuals: true });
-    res.json(deliveries);
+      .sort({ sentDate: -1 });
+    res.json(deliveries.map(d => d.toJSON()));
   } catch (err) { next(err); }
 };
 
@@ -57,6 +56,25 @@ exports.markDelivered = async (req, res, next) => {
     delivery.status = 'yetkazildi';
     delivery.arrivedDate = delivery.arrivedDate || new Date();
     await delivery.save();
+    res.json(delivery.toJSON());
+  } catch (err) { next(err); }
+};
+
+exports.removePayment = async (req, res, next) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) return res.status(404).json({ message: 'Topilmadi' });
+    const idx = delivery.payments.findIndex(p => p._id.toString() === req.params.paymentId);
+    if (idx < 0) return res.status(404).json({ message: "To'lov topilmadi" });
+    const [removed] = delivery.payments.splice(idx, 1);
+    if (delivery.status === 'yakunlandi') {
+      const newPaid = delivery.payments.reduce((s, p) => s + p.amount, 0);
+      if (newPaid < delivery.totalDebt) delivery.status = 'yetkazildi';
+    }
+    await delivery.save();
+    await CashTransaction.deleteMany({
+      relatedDelivery: delivery._id, category: 'yetkazma', amount: removed.amount,
+    });
     res.json(delivery.toJSON());
   } catch (err) { next(err); }
 };

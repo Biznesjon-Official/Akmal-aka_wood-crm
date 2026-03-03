@@ -8,5 +8,6 @@ router.put('/:id', ctrl.update);
 router.delete('/:id', ctrl.remove);
 router.put('/:id/deliver', ctrl.markDelivered);
 router.post('/:id/payment', ctrl.addPayment);
+router.delete('/:id/payments/:paymentId', ctrl.removePayment);
 
 module.exports = router;

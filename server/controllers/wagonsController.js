@@ -127,6 +127,18 @@ exports.updateExpenses = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Add a single RUB expense from cash page (no CashTransaction sync — cash page creates it)
+exports.addExpense = async (req, res, next) => {
+  try {
+    const wagon = await Wagon.findById(req.params.id);
+    if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
+    const { description, amount } = req.body;
+    wagon.expenses.push({ description, amount, currency: 'RUB' });
+    await wagon.save();
+    res.json(wagon);
+  } catch (err) { next(err); }
+};
+
 // Profit summary for selected wagons (for partner share calculation)
 exports.profitSummary = async (req, res, next) => {
   try {
