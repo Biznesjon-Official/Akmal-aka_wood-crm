@@ -53,6 +53,9 @@ export default function Cash() {
   const [selectedWagonIds, setSelectedWagonIds] = useState([]);
   const [profitData, setProfitData] = useState(null);
   const [calcLoading, setCalcLoading] = useState(false);
+  const [editBalanceAccount, setEditBalanceAccount] = useState(null); // 'USD_account'|'RUB_personal'|'RUB_russia'
+  const [editBalanceValue, setEditBalanceValue] = useState(0);
+  const [editBalanceLoading, setEditBalanceLoading] = useState(false);
 
   const typeOptions = [
     { value: 'kirim', label: t('income') },
@@ -91,6 +94,31 @@ export default function Cash() {
     queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  };
+
+  const handleBalanceSave = async () => {
+    const acc = editBalanceAccount;
+    const currency = acc === 'USD_account' ? 'USD' : 'RUB';
+    const currentMap = { USD_account: balance?.USD || 0, RUB_personal: balance?.RUB_personal || 0, RUB_russia: balance?.RUB_russia || 0 };
+    const current = currentMap[acc];
+    const delta = editBalanceValue - current;
+    if (delta === 0) { setEditBalanceAccount(null); return; }
+    setEditBalanceLoading(true);
+    try {
+      await createCashTransaction({
+        type: delta > 0 ? 'kirim' : 'chiqim',
+        category: delta > 0 ? 'boshqa' : undefined,
+        source: undefined,
+        amount: Math.abs(delta),
+        currency,
+        account: acc,
+        description: 'Balans tahrirlash',
+        date: new Date().toISOString(),
+      });
+      invalidateCash();
+      setEditBalanceAccount(null);
+    } catch { message.error(t('error')); }
+    finally { setEditBalanceLoading(false); }
   };
 
   const createMutation = useMutation({
@@ -296,18 +324,38 @@ export default function Cash() {
     <div>
       <Card className="summary-card" style={{ marginBottom: 16 }}>
         <div className="summary-stats">
-          <div className="summary-stat">
-            <span className="summary-stat-label">{t('balanceUsd')}</span>
-            <span className="summary-stat-value highlight">{formatMoney(balance?.USD, 'USD')}</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">{t('personalRub')}</span>
-            <span className="summary-stat-value">{(balance?.RUB_personal || 0).toLocaleString('ru')} ₽</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">{t('russiaRub')}</span>
-            <span className="summary-stat-value">{(balance?.RUB_russia || 0).toLocaleString('ru')} ₽</span>
-          </div>
+          {[
+            { key: 'USD_account', label: t('balanceUsd'), value: balance?.USD || 0, fmt: v => formatMoney(v, 'USD'), cls: 'highlight' },
+            { key: 'RUB_personal', label: t('personalRub'), value: balance?.RUB_personal || 0, fmt: v => `${v.toLocaleString('ru')} ₽` },
+            { key: 'RUB_russia', label: t('russiaRub'), value: balance?.RUB_russia || 0, fmt: v => `${v.toLocaleString('ru')} ₽` },
+          ].map(({ key, label, value, fmt, cls }) => (
+            <div key={key} className="summary-stat" style={{ position: 'relative' }}>
+              <span className="summary-stat-label">{label}</span>
+              {editBalanceAccount === key ? (
+                <Space.Compact size="small" style={{ marginTop: 4 }}>
+                  <InputNumber
+                    autoFocus
+                    value={editBalanceValue}
+                    onChange={v => setEditBalanceValue(v || 0)}
+                    style={{ width: 120 }}
+                    min={0}
+                    onPressEnter={handleBalanceSave}
+                  />
+                  <Button size="small" type="primary" loading={editBalanceLoading} onClick={handleBalanceSave}>✓</Button>
+                  <Button size="small" onClick={() => setEditBalanceAccount(null)}>✕</Button>
+                </Space.Compact>
+              ) : (
+                <span
+                  className={`summary-stat-value${cls ? ' ' + cls : ''}`}
+                  style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                  onClick={() => { setEditBalanceAccount(key); setEditBalanceValue(value); }}
+                >
+                  {fmt(value)}
+                  <EditOutlined style={{ fontSize: 12, opacity: 0.5 }} />
+                </span>
+              )}
+            </div>
+          ))}
           <div className="summary-stat">
             <span className="summary-stat-label">{t('incomeUsd')}</span>
             <span className="summary-stat-value" style={{ color: '#52c41a' }}>+{formatMoney(totalKirimUSD, 'USD')}</span>
