@@ -5,7 +5,7 @@ import CartDrawer from './CartDrawer';
 import {
   DashboardOutlined, CarOutlined, DatabaseOutlined, ShoppingCartOutlined,
   UserOutlined, FileTextOutlined, WalletOutlined, SwapOutlined, TruckOutlined,
-  TeamOutlined, LockOutlined, LogoutOutlined, AccountBookOutlined,
+  TeamOutlined, LockOutlined, LogoutOutlined, AccountBookOutlined, CodeOutlined,
 } from '@ant-design/icons';
 import { setupPin } from '../api';
 import { useLanguage } from '../context/LanguageContext';
@@ -31,6 +31,7 @@ export default function AppLayout() {
     { key: '/cash', icon: <WalletOutlined />, label: t('cash') },
     { key: '/deliveries', icon: <TruckOutlined />, label: t('deliveries') },
     { key: '/suppliers', icon: <TeamOutlined />, label: t('suppliers') },
+    { key: '/coders', icon: <CodeOutlined />, label: 'Kodchilar' },
     { key: '/transfers', icon: <SwapOutlined />, label: t('transfers') },
     { key: '__pin', icon: <LockOutlined />, label: t('changePin') },
     { key: '__logout', icon: <LogoutOutlined />, label: t('logout') },

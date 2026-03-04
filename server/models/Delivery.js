@@ -17,6 +17,7 @@ const deliverySchema = new mongoose.Schema({
   wagonCode: String,
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+  coder: { type: mongoose.Schema.Types.ObjectId, ref: 'Coder' },
   sentDate: { type: Date, default: Date.now },
   arrivedDate: Date,
   status: { type: String, enum: ["yo'lda", 'yetkazildi', 'yakunlandi'], default: "yo'lda" },

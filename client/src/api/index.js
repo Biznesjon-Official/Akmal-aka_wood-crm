@@ -169,6 +169,17 @@ export const deleteSupplier = (id) =>
 export const getSupplierWagons = (id) =>
   api.get(`/suppliers/${id}/wagons`).then((r) => r.data);
 
+// Coders
+export const getCoders = () => api.get("/coders").then((r) => r.data);
+export const createCoder = (data) =>
+  api.post("/coders", data).then((r) => r.data);
+export const updateCoder = (id, data) =>
+  api.put(`/coders/${id}`, data).then((r) => r.data);
+export const deleteCoder = (id) =>
+  api.delete(`/coders/${id}`).then((r) => r.data);
+export const getCoderCodes = (id) =>
+  api.get(`/coders/${id}/codes`).then((r) => r.data);
+
 // Settings
 export const getExchangeRate = () =>
   api.get("/settings/exchange-rate").then((r) => r.data);
