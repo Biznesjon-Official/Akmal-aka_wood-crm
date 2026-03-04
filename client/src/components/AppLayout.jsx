@@ -64,7 +64,7 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed}>
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} width={240}>
         <div style={{ height: 32, margin: 16, color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: collapsed ? 14 : 16 }}>
           {collapsed ? 'YS' : t('appName')}
         </div>
