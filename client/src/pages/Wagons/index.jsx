@@ -9,7 +9,7 @@ import {
   ArrowRightOutlined, CalendarOutlined, SendOutlined, EnvironmentOutlined, ShoppingCartOutlined, CarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse, getSuppliers } from '../../api';
+import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse, getSuppliers, getCoders } from '../../api';
 import DeliveriesTab from '../Deliveries';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
@@ -40,7 +40,7 @@ function getWoodExpense(expenses) {
 }
 
 // ===================== CREATE MODAL =====================
-function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon', suppliers = [] }) {
+function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transportType = 'vagon', suppliers = [], coders = [] }) {
   const { t } = useLanguage();
   const isMashina = transportType === 'mashina';
   const [wagonCode, setWagonCode] = useState('');
@@ -49,9 +49,13 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   const [sentDate, setSentDate] = useState(null);
   const [arrivedDate, setArrivedDate] = useState(null);
   const [supplier, setSupplier] = useState(null);
+  const [coder, setCoder] = useState(null);
   const [errors, setErrors] = useState({});
 
   const [wood, setWood] = useState({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
+  const [kodUZ, setKodUZ] = useState(0);
+  const [kodKZ, setKodKZ] = useState(0);
+  const [fixedExpenses, setFixedExpenses] = useState({});
   const [bundles, setBundles] = useState([]);
 
   const handleOk = () => {
@@ -65,13 +69,19 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       message.warning(t('mandatoryFields'));
       return;
     }
-    // Only wood purchase expense from create modal
     const expenses = [];
     if (wood.amount > 0) expenses.push({ description: WOOD_EXPENSE_KEY, amount: wood.amount, currency: 'RUB' });
+    if (kodUZ > 0) expenses.push({ description: 'Kod UZ', amount: kodUZ, currency: 'USD' });
+    if (kodKZ > 0) expenses.push({ description: 'Kod KZ', amount: kodKZ, currency: 'USD' });
+    FIXED_EXPENSES.forEach((name) => {
+      const val = fixedExpenses[name];
+      if (val > 0) expenses.push({ description: name, amount: val, currency: 'USD' });
+    });
     onSave({
       type: transportType,
       wagonCode, origin, destination,
       supplier: supplier || null,
+      coder: coder || null,
       sentDate: sentDate?.toISOString() || null,
       arrivedDate: arrivedDate?.toISOString() || null,
       expenses,
@@ -81,6 +91,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
 
   const handleAfterClose = () => {
     setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null); setSupplier(null);
+    setCoder(null); setKodUZ(0); setKodKZ(0); setFixedExpenses({});
     setWood({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
     setBundles([]); setErrors({});
   };
@@ -142,6 +153,52 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
                 options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />
             </td>
           </tr>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={labelS}>Kodchi</td>
+            <td style={cellS}>
+              <Select size="small" style={{ width: '100%' }} allowClear placeholder="Kodchi tanlang"
+                value={coder} onChange={setCoder} showSearch optionFilterProp="label"
+                options={(coders || []).map(c => ({ value: c._id, label: c.name }))} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Kod narxlari */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Kod narxlari (USD)</Divider>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+        <tbody>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={{ ...labelS, width: 160 }}>Kod UZ</td>
+            <td style={cellS}>
+              <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
+                value={kodUZ || undefined} onChange={(v) => setKodUZ(v || 0)} />
+            </td>
+          </tr>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={labelS}>Kod KZ</td>
+            <td style={cellS}>
+              <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
+                value={kodKZ || undefined} onChange={(v) => setKodKZ(v || 0)} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Xarajatlar */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar (USD)</Divider>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+        <tbody>
+          {FIXED_EXPENSES.map((name) => (
+            <tr key={name} style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ ...labelS, width: 160 }}>{name}</td>
+              <td style={cellS}>
+                <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
+                  value={fixedExpenses[name] || undefined}
+                  onChange={(v) => setFixedExpenses((p) => ({ ...p, [name]: v || 0 }))} />
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
 
@@ -691,6 +748,7 @@ export default function Wagons() {
   const { data: wagons = [], isLoading } = useQuery({ queryKey: ['wagons', filters], queryFn: () => getWagons(filters) });
   const { data: rateData } = useQuery({ queryKey: ['exchangeRate'], queryFn: getExchangeRate });
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
+  const { data: codersList = [] } = useQuery({ queryKey: ['coders'], queryFn: getCoders });
 
   const createMutation = useMutation({
     mutationFn: createWagon,
@@ -830,7 +888,7 @@ export default function Wagons() {
 
       <CreateWagonModal open={createOpen} onCancel={() => setCreateOpen(false)}
         onSave={(data) => createMutation.mutate(data)} loading={createMutation.isPending}
-        globalRate={rateData?.rate || 0} transportType={createType} suppliers={suppliers} />
+        globalRate={rateData?.rate || 0} transportType={createType} suppliers={suppliers} coders={codersList} />
 
       <WagonDetailModal wagon={selectedWagon} open={!!selectedWagon} onClose={() => setSelectedWagon(null)}
         onUpdate={(data) => updateMutation.mutate({ id: selectedWagon._id, data })}
