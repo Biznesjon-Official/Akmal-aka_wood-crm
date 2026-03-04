@@ -117,7 +117,7 @@ export default function WagonDetail() {
       </Space>
 
       <Descriptions bordered column={2} size="small" style={{ marginBottom: 24 }}>
-        <Descriptions.Item label="Vagon kodi">{wagon.wagonCode}</Descriptions.Item>
+        <Descriptions.Item label="Vagon raqami">{wagon.wagonCode}</Descriptions.Item>
         <Descriptions.Item label="Status">
           <Tag color={statusColors[wagon.status]}>{statusLabels[wagon.status] || wagon.status}</Tag>
         </Descriptions.Item>
@@ -166,7 +166,7 @@ export default function WagonDetail() {
         confirmLoading={updateMutation.isPending}
       >
         <Form form={editForm} layout="vertical" onFinish={handleEdit}>
-          <Form.Item name="wagonCode" label="Vagon kodi" rules={[{ required: true }]}>
+          <Form.Item name="wagonCode" label="Vagon raqami" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
           <Form.Item name="sentDate" label="Yuborilgan sana">

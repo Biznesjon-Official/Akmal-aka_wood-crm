@@ -125,7 +125,7 @@ export const translations = {
     // Wagons
     newWagon: 'Yangi vagon',
     newTruck: 'Yangi mashina',
-    wagonCode: 'Vagon kodi',
+    wagonCode: 'Vagon raqami',
     truckCode: 'Mashina raqami',
     origin: 'Qayerdan',
     destination: 'Qayerga',
@@ -487,7 +487,7 @@ export const translations = {
     // Wagons
     newWagon: 'Новый вагон',
     newTruck: 'Новая машина',
-    wagonCode: 'Код вагона',
+    wagonCode: 'Номер вагона',
     truckCode: 'Номер машины',
     origin: 'Откуда',
     destination: 'Куда',

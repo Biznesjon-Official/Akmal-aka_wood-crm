@@ -359,7 +359,7 @@ export default function CustomerDetail() {
               pagination={false}
               locale={{ emptyText: 'Vagonlar yo\'q' }}
               columns={[
-                { title: 'Vagon kodi', dataIndex: 'wagonCode', key: 'wagonCode' },
+                { title: 'Vagon raqami', dataIndex: 'wagonCode', key: 'wagonCode' },
                 { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => <Tag color={statusColors[v]}>{statusLabels[v] || v}</Tag> },
                 { title: 'Yuborilgan', dataIndex: 'sentDate', key: 'sentDate', render: formatDate },
                 { title: 'Kodchi', key: 'coder', render: (_, r) => r.coder?.name || '—' },

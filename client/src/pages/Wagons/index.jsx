@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Tag, Input, InputNumber, Select, DatePicker, Space, Tabs, Row, Col, Card, Segmented,
-  Popconfirm, Modal, Divider, Typography, Descriptions, message,
+  Popconfirm, Modal, Divider, Typography, Descriptions, message, Checkbox,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, MinusCircleOutlined, InboxOutlined, AppstoreOutlined, BarsOutlined,
   ArrowRightOutlined, CalendarOutlined, SendOutlined, EnvironmentOutlined, ShoppingCartOutlined, CarOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse, getSuppliers, getCoders } from '../../api';
+import { getWagons, createWagon, updateWagon, deleteWagon, getExchangeRate, allBundlesToWarehouse, getSuppliers, getCoders, assignCoderCode } from '../../api';
 import DeliveriesTab from '../Deliveries';
 import { formatDate, formatM3, formatMoney, statusLabels, statusColors, calcM3PerPiece } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
@@ -50,13 +50,16 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   const [arrivedDate, setArrivedDate] = useState(null);
   const [supplier, setSupplier] = useState(null);
   const [coder, setCoder] = useState(null);
+  const [selectedCodes, setSelectedCodes] = useState([]);
   const [errors, setErrors] = useState({});
 
   const [wood, setWood] = useState({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
-  const [kodUZ, setKodUZ] = useState(0);
-  const [kodKZ, setKodKZ] = useState(0);
   const [fixedExpenses, setFixedExpenses] = useState({});
   const [bundles, setBundles] = useState([]);
+
+  // Get selected coder's available codes
+  const selectedCoderObj = coders.find(c => c._id === coder);
+  const availableCodes = (selectedCoderObj?.codes || []).filter(c => c.status === 'mavjud');
 
   const handleOk = () => {
     const errs = {};
@@ -71,8 +74,14 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
     }
     const expenses = [];
     if (wood.amount > 0) expenses.push({ description: WOOD_EXPENSE_KEY, amount: wood.amount, currency: 'RUB' });
-    if (kodUZ > 0) expenses.push({ description: 'Kod UZ', amount: kodUZ, currency: 'USD' });
-    if (kodKZ > 0) expenses.push({ description: 'Kod KZ', amount: kodKZ, currency: 'USD' });
+    // Add selected codes as expenses
+    const coderCodes = selectedCoderObj?.codes || [];
+    selectedCodes.forEach(codeId => {
+      const code = coderCodes.find(c => c._id === codeId);
+      if (code && code.costPrice > 0) {
+        expenses.push({ description: `Kod ${code.type} (${code.name})`, amount: code.costPrice, currency: code.currency });
+      }
+    });
     FIXED_EXPENSES.forEach((name) => {
       const val = fixedExpenses[name];
       if (val > 0) expenses.push({ description: name, amount: val, currency: 'USD' });
@@ -86,12 +95,13 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       arrivedDate: arrivedDate?.toISOString() || null,
       expenses,
       woodBundles: bundles.filter((b) => b.thickness && b.width && b.length && b.count),
+      _selectedCodeIds: selectedCodes,
     });
   };
 
   const handleAfterClose = () => {
     setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null); setSupplier(null);
-    setCoder(null); setKodUZ(0); setKodKZ(0); setFixedExpenses({});
+    setCoder(null); setSelectedCodes([]); setFixedExpenses({});
     setWood({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
     setBundles([]); setErrors({});
   };
@@ -157,33 +167,46 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
             <td style={labelS}>Kodchi</td>
             <td style={cellS}>
               <Select size="small" style={{ width: '100%' }} allowClear placeholder="Kodchi tanlang"
-                value={coder} onChange={setCoder} showSearch optionFilterProp="label"
+                value={coder} onChange={(v) => { setCoder(v); setSelectedCodes([]); }} showSearch optionFilterProp="label"
                 options={(coders || []).map(c => ({ value: c._id, label: c.name }))} />
             </td>
           </tr>
         </tbody>
       </table>
 
-      {/* Kod narxlari */}
-      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Kod narxlari (USD)</Divider>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
-        <tbody>
-          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ ...labelS, width: 160 }}>Kod UZ</td>
-            <td style={cellS}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
-                value={kodUZ || undefined} onChange={(v) => setKodUZ(v || 0)} />
-            </td>
-          </tr>
-          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>Kod KZ</td>
-            <td style={cellS}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
-                value={kodKZ || undefined} onChange={(v) => setKodKZ(v || 0)} />
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      {/* Kod olish — from coder inventory */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Kod olish</Divider>
+      {coder ? (
+        availableCodes.length > 0 ? (
+          <div style={{ marginBottom: 8 }}>
+            {availableCodes.map(code => (
+              <div key={code._id} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <Checkbox
+                  checked={selectedCodes.includes(code._id)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedCodes(prev => [...prev, code._id]);
+                    } else {
+                      setSelectedCodes(prev => prev.filter(id => id !== code._id));
+                    }
+                  }}
+                >
+                  <Tag color={code.type === 'UZ' ? 'green' : code.type === 'KZ' ? 'orange' : 'blue'}>{code.type}</Tag>
+                  <Text strong>{code.name}</Text>
+                  <Text type="secondary" style={{ marginLeft: 8 }}>
+                    {code.costPrice > 0 ? `${code.costPrice} ${code.currency}` : ''}
+                    {code.sellPrice > 0 ? ` / sotuv: ${code.sellPrice} ${code.currency}` : ''}
+                  </Text>
+                </Checkbox>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>Kodchida mavjud kodlar yo'q</Text>
+        )
+      ) : (
+        <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>Avval kodchini tanlang</Text>
+      )}
 
       {/* Xarajatlar */}
       <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar (USD)</Divider>
@@ -751,8 +774,23 @@ export default function Wagons() {
   const { data: codersList = [] } = useQuery({ queryKey: ['coders'], queryFn: getCoders });
 
   const createMutation = useMutation({
-    mutationFn: createWagon,
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['wagons'] }); setCreateOpen(false); message.success(createType === 'mashina' ? t('truckCreated') : t('wagonCreated')); },
+    mutationFn: async (data) => {
+      const { _selectedCodeIds, ...wagonData } = data;
+      const wagon = await createWagon(wagonData);
+      // Assign selected codes to this wagon
+      if (_selectedCodeIds?.length && wagonData.coder) {
+        await Promise.all(_selectedCodeIds.map(codeId =>
+          assignCoderCode(wagonData.coder, codeId, { assignedTo: wagon._id, assignedModel: 'Wagon' })
+        ));
+      }
+      return wagon;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wagons'] });
+      queryClient.invalidateQueries({ queryKey: ['coders'] });
+      setCreateOpen(false);
+      message.success(createType === 'mashina' ? t('truckCreated') : t('wagonCreated'));
+    },
     onError: () => message.error('Yaratishda xatolik'),
   });
 
@@ -782,7 +820,7 @@ export default function Wagons() {
 
   const columns = [
     { title: 'Turi', dataIndex: 'type', key: 'type', width: 80, render: (t) => t === 'mashina' ? <Tag color="blue">Mashina</Tag> : <Tag color="green">Vagon</Tag> },
-    { title: 'Kod/Raqam', dataIndex: 'wagonCode', key: 'wagonCode', width: 120 },
+    { title: 'Raqam', dataIndex: 'wagonCode', key: 'wagonCode', width: 120 },
     { title: 'Status', dataIndex: 'status', key: 'status', width: 100, render: (s) => <Tag color={statusColors[s]}>{statusLabels[s] || s}</Tag> },
     { title: "Jo'natilgan", dataIndex: 'sentDate', key: 'sentDate', width: 110, render: formatDate },
     { title: 'Kelgan', dataIndex: 'arrivedDate', key: 'arrivedDate', width: 110, render: formatDate },

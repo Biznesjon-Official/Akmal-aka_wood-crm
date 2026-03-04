@@ -2,20 +2,21 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Tabs, Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select,
-  AutoComplete, Radio, message, Tag, Space, Popconfirm, Typography, Empty, Divider,
+  AutoComplete, Radio, message, Tag, Space, Popconfirm, Typography, Empty, Divider, Checkbox,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined } from '@ant-design/icons';
-import dayjs from 'dayjs';
 import {
   getCoders, createCoder, updateCoder, deleteCoder, getCoderCodes,
+  addCoderCode, removeCoderCode, assignCoderCode,
   createWagon, createDelivery, getCustomers, createCustomer, getSuppliers,
 } from '../../api';
-import { formatDate } from '../../utils/format';
+import { formatDate, formatMoney } from '../../utils/format';
 
 const { Text } = Typography;
 
 const WAGON_STATUS_COLOR = { kelyapti: 'orange', faol: 'blue', omborda: 'cyan', sotildi: 'green' };
 const DELIVERY_STATUS_COLOR = { "yo'lda": 'orange', yetkazildi: 'blue', yakunlandi: 'green' };
+const CODE_TYPE_COLOR = { UZ: 'green', KZ: 'orange', AVG: 'blue' };
 
 const cellS = { padding: '6px 10px' };
 const labelS = { ...cellS, fontWeight: 500, background: '#fafafa', whiteSpace: 'nowrap', width: 160 };
@@ -28,6 +29,11 @@ export default function Coders() {
   const [codeModal, setCodeModal] = useState(false);
   const [codeType, setCodeType] = useState('wagon');
   const [coderForm] = Form.useForm();
+  const [subTab, setSubTab] = useState('inventory');
+
+  // Add code modal state
+  const [addCodeModal, setAddCodeModal] = useState(false);
+  const [addCodeForm] = Form.useForm();
 
   // Wagon state
   const [wagonType, setWagonType] = useState('vagon');
@@ -47,18 +53,10 @@ export default function Coders() {
   const [dlvSentDate, setDlvSentDate] = useState(null);
   const [dlvCargoType, setDlvCargoType] = useState('');
   const [dlvCargoWeight, setDlvCargoWeight] = useState(null);
-  const [dlvUzCode, setDlvUzCode] = useState('');
-  const [dlvKzCode, setDlvKzCode] = useState('');
-  const [dlvAvgCode, setDlvAvgCode] = useState('');
   const [dlvOgirlik, setDlvOgirlik] = useState(null);
-  const [dlvUzCost, setDlvUzCost] = useState(null);
-  const [dlvUzRate, setDlvUzRate] = useState(null);
-  const [dlvKzCost, setDlvKzCost] = useState(null);
-  const [dlvKzRate, setDlvKzRate] = useState(null);
-  const [dlvAvgCost, setDlvAvgCost] = useState(null);
-  const [dlvAvgExpense, setDlvAvgExpense] = useState(null);
   const [dlvPrastoy, setDlvPrastoy] = useState(null);
   const [dlvErrors, setDlvErrors] = useState({});
+  const [dlvSelectedCodes, setDlvSelectedCodes] = useState([]);
 
   const { data: coders = [] } = useQuery({ queryKey: ['coders'], queryFn: getCoders });
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: () => getCustomers() });
@@ -66,12 +64,17 @@ export default function Coders() {
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
 
   const selectedCoderId = activeTab || coders[0]?._id;
+  const currentCoder = coders.find(c => c._id === selectedCoderId);
 
   const { data: codes = [], isLoading: codesLoading } = useQuery({
     queryKey: ['coder-codes', selectedCoderId],
     queryFn: () => getCoderCodes(selectedCoderId),
     enabled: !!selectedCoderId,
   });
+
+  // Get inventory codes from currentCoder
+  const inventoryCodes = currentCoder?.codes || [];
+  const availableCodes = inventoryCodes.filter(c => c.status === 'mavjud');
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['coders'] });
@@ -112,19 +115,44 @@ export default function Coders() {
     onSuccess: () => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['wagons'] });
-      message.success('Vagon kodi yaratildi');
+      message.success('Vagon yaratildi');
       setCodeModal(false);
     },
   });
 
   const createDeliveryMut = useMutation({
-    mutationFn: createDelivery,
+    mutationFn: async (data) => {
+      const { _selectedCodeIds, ...dlvData } = data;
+      const delivery = await createDelivery(dlvData);
+      // Assign selected codes
+      if (_selectedCodeIds?.length && dlvData.coder) {
+        await Promise.all(_selectedCodeIds.map(codeId =>
+          assignCoderCode(dlvData.coder, codeId, { assignedTo: delivery._id, assignedModel: 'Delivery' })
+        ));
+      }
+      return delivery;
+    },
     onSuccess: () => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
-      message.success('Yetkazib berish kodi yaratildi');
+      message.success('Yetkazib berish yaratildi');
       setCodeModal(false);
     },
+  });
+
+  const addCodeMut = useMutation({
+    mutationFn: (data) => addCoderCode(selectedCoderId, data),
+    onSuccess: () => {
+      invalidate();
+      message.success('Kod qo\'shildi');
+      setAddCodeModal(false);
+      addCodeForm.resetFields();
+    },
+  });
+
+  const removeCodeMut = useMutation({
+    mutationFn: (codeId) => removeCoderCode(selectedCoderId, codeId),
+    onSuccess: () => { invalidate(); message.success('Kod o\'chirildi'); },
   });
 
   // Coder modal handlers
@@ -176,18 +204,10 @@ export default function Coders() {
     setDlvSentDate(null);
     setDlvCargoType('');
     setDlvCargoWeight(null);
-    setDlvUzCode('');
-    setDlvKzCode('');
-    setDlvAvgCode('');
     setDlvOgirlik(null);
-    setDlvUzCost(null);
-    setDlvUzRate(null);
-    setDlvKzCost(null);
-    setDlvKzRate(null);
-    setDlvAvgCost(null);
-    setDlvAvgExpense(null);
     setDlvPrastoy(null);
     setDlvErrors({});
+    setDlvSelectedCodes([]);
   };
 
   const handleWagonSubmit = () => {
@@ -221,7 +241,6 @@ export default function Coders() {
       message.warning('Mijozni kiriting');
       return;
     }
-    // Find or create customer
     const existing = customers.find(c => c.name === dlvCustomerName);
     let customerId;
     if (existing) {
@@ -230,6 +249,13 @@ export default function Coders() {
       const newCust = await createCustomerMut.mutateAsync({ name: dlvCustomerName });
       customerId = newCust._id;
     }
+
+    // Map selected codes to delivery fields
+    const selCodes = inventoryCodes.filter(c => dlvSelectedCodes.includes(c._id));
+    const uzSel = selCodes.find(c => c.type === 'UZ');
+    const kzSel = selCodes.find(c => c.type === 'KZ');
+    const avgSel = selCodes.find(c => c.type === 'AVG');
+
     createDeliveryMut.mutate({
       customer: customerId,
       wagonCode: dlvWagonCode || undefined,
@@ -238,23 +264,25 @@ export default function Coders() {
       cargoType: dlvCargoType || undefined,
       cargoWeight: dlvCargoWeight || undefined,
       ogirlik: dlvOgirlik || undefined,
-      uzCode: dlvUzCode || undefined,
-      uzCost: dlvUzCost || undefined,
-      uzRate: dlvUzRate || undefined,
-      kzCode: dlvKzCode || undefined,
-      kzCost: dlvKzCost || undefined,
-      kzRate: dlvKzRate || undefined,
-      avgCode: dlvAvgCode || undefined,
-      avgCost: dlvAvgCost || undefined,
-      avgExpense: dlvAvgExpense || undefined,
+      uzCode: uzSel?.name || undefined,
+      uzCost: uzSel?.costPrice || undefined,
+      uzRate: uzSel?.sellPrice || undefined,
+      kzCode: kzSel?.name || undefined,
+      kzCost: kzSel?.costPrice || undefined,
+      kzRate: kzSel?.sellPrice || undefined,
+      avgCode: avgSel?.name || undefined,
+      avgCost: avgSel?.costPrice || undefined,
+      avgExpense: avgSel?.sellPrice || undefined,
       prastoy: dlvPrastoy || undefined,
       coder: selectedCoderId,
+      _selectedCodeIds: dlvSelectedCodes,
     });
   };
 
   const customerOptions = customers.map(c => ({ label: c.name, value: c.name }));
 
-  const columns = [
+  // History table columns
+  const historyColumns = [
     {
       title: 'Turi',
       dataIndex: 'type',
@@ -265,7 +293,7 @@ export default function Coders() {
         </Tag>
       ),
     },
-    { title: 'Vagon kodi', dataIndex: 'wagonCode', width: 140 },
+    { title: 'Vagon raqami', dataIndex: 'wagonCode', width: 140 },
     { title: 'Mijoz', dataIndex: 'customer', width: 160, render: (c) => c?.name || '-' },
     { title: 'Sana', dataIndex: 'sentDate', width: 120, render: (d) => d ? formatDate(d) : '-' },
     {
@@ -279,8 +307,54 @@ export default function Coders() {
     },
   ];
 
+  // Inventory table columns
+  const inventoryColumns = [
+    { title: 'Nomi', dataIndex: 'name', width: 140 },
+    {
+      title: 'Turi',
+      dataIndex: 'type',
+      width: 80,
+      render: (t) => <Tag color={CODE_TYPE_COLOR[t]}>{t}</Tag>,
+    },
+    {
+      title: 'Tannarx',
+      dataIndex: 'costPrice',
+      width: 100,
+      render: (v, row) => v ? `${formatMoney(v)} ${row.currency}` : '-',
+    },
+    {
+      title: 'Sotuv narxi',
+      dataIndex: 'sellPrice',
+      width: 100,
+      render: (v, row) => v ? `${formatMoney(v)} ${row.currency}` : '-',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      width: 100,
+      render: (s) => <Tag color={s === 'mavjud' ? 'green' : 'red'}>{s}</Tag>,
+    },
+    {
+      title: 'Biriktirilgan',
+      dataIndex: 'assignedModel',
+      width: 140,
+      render: (model) => {
+        if (!model) return '-';
+        return <Tag color="blue">{model === 'Wagon' ? 'Vagon' : 'Delivery'}</Tag>;
+      },
+    },
+    {
+      title: '',
+      width: 50,
+      render: (_, row) => row.status === 'mavjud' ? (
+        <Popconfirm title="Kodni o'chirish?" onConfirm={() => removeCodeMut.mutate(row._id)}>
+          <Button size="small" danger icon={<DeleteOutlined />} type="text" />
+        </Popconfirm>
+      ) : null,
+    },
+  ];
+
   const tabItems = coders.map(c => ({ key: c._id, label: c.name }));
-  const currentCoder = coders.find(c => c._id === selectedCoderId);
   const isMashina = wagonType === 'mashina';
 
   return (
@@ -309,13 +383,48 @@ export default function Coders() {
             <Button type="primary" onClick={openCodeModal}>Kod olish</Button>
           </Space>
 
-          <Table
-            columns={columns}
-            dataSource={codes}
-            rowKey="_id"
-            loading={codesLoading}
+          <Tabs
+            activeKey={subTab}
+            onChange={setSubTab}
             size="small"
-            pagination={{ pageSize: 20 }}
+            items={[
+              {
+                key: 'inventory',
+                label: `Kodlar inventoriya (${inventoryCodes.length})`,
+                children: (
+                  <div>
+                    <Button
+                      type="dashed" icon={<PlusOutlined />} size="small"
+                      style={{ marginBottom: 12 }}
+                      onClick={() => { addCodeForm.resetFields(); setAddCodeModal(true); }}
+                    >
+                      Kod qo'shish
+                    </Button>
+                    <Table
+                      columns={inventoryColumns}
+                      dataSource={inventoryCodes}
+                      rowKey="_id"
+                      size="small"
+                      pagination={false}
+                    />
+                  </div>
+                ),
+              },
+              {
+                key: 'history',
+                label: `Kodlar tarixi (${codes.length})`,
+                children: (
+                  <Table
+                    columns={historyColumns}
+                    dataSource={codes}
+                    rowKey="_id"
+                    loading={codesLoading}
+                    size="small"
+                    pagination={{ pageSize: 20 }}
+                  />
+                ),
+              },
+            ]}
           />
         </div>
       ) : (
@@ -344,7 +453,42 @@ export default function Coders() {
         </Form>
       </Modal>
 
-      {/* Code creation modal */}
+      {/* Add code to inventory modal */}
+      <Modal
+        title="Yangi kod qo'shish"
+        open={addCodeModal}
+        onOk={() => addCodeForm.validateFields().then(v => addCodeMut.mutate(v))}
+        onCancel={() => setAddCodeModal(false)}
+        confirmLoading={addCodeMut.isPending}
+        okText="Qo'shish" cancelText="Bekor"
+      >
+        <Form form={addCodeForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="name" label="Kod nomi" rules={[{ required: true, message: 'Nom kiriting' }]}>
+            <Input placeholder="UZ-1234" />
+          </Form.Item>
+          <Form.Item name="type" label="Turi" rules={[{ required: true, message: 'Turini tanlang' }]}>
+            <Select options={[
+              { label: 'UZ', value: 'UZ' },
+              { label: 'KZ', value: 'KZ' },
+              { label: 'AVG', value: 'AVG' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="costPrice" label="Tannarx">
+            <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="sellPrice" label="Sotuv narxi">
+            <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="currency" label="Valyuta" initialValue="USD">
+            <Select options={[
+              { label: 'USD', value: 'USD' },
+              { label: 'RUB', value: 'RUB' },
+            ]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Code creation modal (wagon/delivery) */}
       <Modal
         title="Kod olish"
         open={codeModal}
@@ -378,12 +522,12 @@ export default function Coders() {
                   </td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>{isMashina ? 'Mashina kodi' : 'Vagon kodi'} <span style={{ color: '#ff4d4f' }}>*</span></td>
+                  <td style={labelS}>{isMashina ? 'Mashina raqami' : 'Vagon raqami'} <span style={{ color: '#ff4d4f' }}>*</span></td>
                   <td style={cellS}>
                     {isMashina ? (
                       <Input size="small" value={wagonCode}
                         onChange={(e) => { const v = e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase(); setWagonCode(v); if (v) setWagonErrors(p => ({ ...p, wagonCode: false })); }}
-                        status={wagonErrors.wagonCode ? 'error' : undefined} placeholder="Mashina kodi" />
+                        status={wagonErrors.wagonCode ? 'error' : undefined} placeholder="Mashina raqami" />
                     ) : (
                       <Input size="small" value={wagonCode}
                         onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 8); setWagonCode(v); if (v) setWagonErrors(p => ({ ...p, wagonCode: false })); }}
@@ -483,7 +627,7 @@ export default function Coders() {
                 </td>
               </tr>
               <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>Vagon kodi</td>
+                <td style={labelS}>Vagon raqami</td>
                 <td style={cellS}>
                   <Input size="small" value={dlvWagonCode} onChange={(e) => setDlvWagonCode(e.target.value)} />
                 </td>
@@ -521,74 +665,46 @@ export default function Coders() {
                 </td>
               </tr>
 
-              {/* UZ */}
+              {/* Code selection from inventory */}
               <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
-                <td colSpan={2} style={{ ...cellS, fontWeight: 600 }}>UZ kod</td>
+                <td colSpan={2} style={{ ...cellS, fontWeight: 600 }}>Kodlar tanlash (inventoriyadan)</td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>UZ kodi</td>
-                <td style={cellS}>
-                  <Input size="small" value={dlvUzCode} onChange={(e) => setDlvUzCode(e.target.value)} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>UZ tannarx ($/t)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvUzCost} onChange={setDlvUzCost} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>UZ sotuv ($/t)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvUzRate} onChange={setDlvUzRate} />
-                </td>
-              </tr>
+              {availableCodes.length > 0 ? (
+                availableCodes.map(code => (
+                  <tr key={code._id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                    <td colSpan={2} style={cellS}>
+                      <Checkbox
+                        checked={dlvSelectedCodes.includes(code._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            // Only allow one code per type
+                            setDlvSelectedCodes(prev => {
+                              const filtered = prev.filter(id => {
+                                const existing = inventoryCodes.find(c => c._id === id);
+                                return existing?.type !== code.type;
+                              });
+                              return [...filtered, code._id];
+                            });
+                          } else {
+                            setDlvSelectedCodes(prev => prev.filter(id => id !== code._id));
+                          }
+                        }}
+                      >
+                        <Tag color={CODE_TYPE_COLOR[code.type]}>{code.type}</Tag>
+                        <Text strong>{code.name}</Text>
+                        <Text type="secondary" style={{ marginLeft: 8 }}>
+                          tannarx: {formatMoney(code.costPrice)} {code.currency} / sotuv: {formatMoney(code.sellPrice)} {code.currency}
+                        </Text>
+                      </Checkbox>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td colSpan={2} style={{ ...cellS, color: '#999' }}>Mavjud kodlar yo'q</td>
+                </tr>
+              )}
 
-              {/* KZ */}
-              <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fff7e6' }}>
-                <td colSpan={2} style={{ ...cellS, fontWeight: 600 }}>KZ kod</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>KZ kodi</td>
-                <td style={cellS}>
-                  <Input size="small" value={dlvKzCode} onChange={(e) => setDlvKzCode(e.target.value)} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>KZ tannarx ($/t)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvKzCost} onChange={setDlvKzCost} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>KZ sotuv ($/t)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvKzRate} onChange={setDlvKzRate} />
-                </td>
-              </tr>
-
-              {/* AVG */}
-              <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f0f5ff' }}>
-                <td colSpan={2} style={{ ...cellS, fontWeight: 600 }}>AVG kod</td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>AVG kodi</td>
-                <td style={cellS}>
-                  <Input size="small" value={dlvAvgCode} onChange={(e) => setDlvAvgCode(e.target.value)} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>AVG tannarx ($)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvAvgCost} onChange={setDlvAvgCost} />
-                </td>
-              </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>AVG sotuv ($)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvAvgExpense} onChange={setDlvAvgExpense} />
-                </td>
-              </tr>
               <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
                 <td style={labelS}>Prastoy ($)</td>
                 <td style={cellS}>

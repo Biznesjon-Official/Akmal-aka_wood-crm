@@ -76,3 +76,56 @@ exports.getCodes = async (req, res, next) => {
     res.json(codes);
   } catch (err) { next(err); }
 };
+
+// Code inventory endpoints
+exports.addCode = async (req, res, next) => {
+  try {
+    const coder = await Coder.findById(req.params.id);
+    if (!coder) return res.status(404).json({ message: 'Kodchi topilmadi' });
+    coder.codes.push(req.body);
+    await coder.save();
+    res.status(201).json(coder.codes[coder.codes.length - 1]);
+  } catch (err) { next(err); }
+};
+
+exports.removeCode = async (req, res, next) => {
+  try {
+    const coder = await Coder.findById(req.params.id);
+    if (!coder) return res.status(404).json({ message: 'Kodchi topilmadi' });
+    const code = coder.codes.id(req.params.codeId);
+    if (!code) return res.status(404).json({ message: 'Kod topilmadi' });
+    if (code.status === 'band') return res.status(400).json({ message: 'Band kodni o\'chirib bo\'lmaydi' });
+    code.deleteOne();
+    await coder.save();
+    res.json({ message: 'Deleted' });
+  } catch (err) { next(err); }
+};
+
+exports.assignCode = async (req, res, next) => {
+  try {
+    const coder = await Coder.findById(req.params.id);
+    if (!coder) return res.status(404).json({ message: 'Kodchi topilmadi' });
+    const code = coder.codes.id(req.params.codeId);
+    if (!code) return res.status(404).json({ message: 'Kod topilmadi' });
+    if (code.status === 'band') return res.status(400).json({ message: 'Kod allaqachon band' });
+    code.status = 'band';
+    code.assignedTo = req.body.assignedTo;
+    code.assignedModel = req.body.assignedModel;
+    await coder.save();
+    res.json(code);
+  } catch (err) { next(err); }
+};
+
+exports.releaseCode = async (req, res, next) => {
+  try {
+    const coder = await Coder.findById(req.params.id);
+    if (!coder) return res.status(404).json({ message: 'Kodchi topilmadi' });
+    const code = coder.codes.id(req.params.codeId);
+    if (!code) return res.status(404).json({ message: 'Kod topilmadi' });
+    code.status = 'mavjud';
+    code.assignedTo = undefined;
+    code.assignedModel = undefined;
+    await coder.save();
+    res.json(code);
+  } catch (err) { next(err); }
+};

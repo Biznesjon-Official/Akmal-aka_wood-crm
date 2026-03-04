@@ -181,6 +181,14 @@ export const deleteCoder = (id) =>
   api.delete(`/coders/${id}`).then((r) => r.data);
 export const getCoderCodes = (id) =>
   api.get(`/coders/${id}/codes`).then((r) => r.data);
+export const addCoderCode = (id, data) =>
+  api.post(`/coders/${id}/codes`, data).then((r) => r.data);
+export const removeCoderCode = (id, codeId) =>
+  api.delete(`/coders/${id}/codes/${codeId}`).then((r) => r.data);
+export const assignCoderCode = (id, codeId, data) =>
+  api.put(`/coders/${id}/codes/${codeId}/assign`, data).then((r) => r.data);
+export const releaseCoderCode = (id, codeId) =>
+  api.put(`/coders/${id}/codes/${codeId}/release`).then((r) => r.data);
 
 // Partners
 export const getPartners = () => api.get("/partners").then((r) => r.data);
