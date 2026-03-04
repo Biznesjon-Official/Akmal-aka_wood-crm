@@ -25,15 +25,18 @@ const deliverySchema = new mongoose.Schema({
   cargoType: String,
   cargoWeight: Number,
 
-  // Per-ton tariffs (USD/ton) — mijoz qarzi
+  // Per-ton tariffs (USD/ton)
   uzCode: String,
-  uzRate: { type: Number, default: 0 },
+  uzCost: { type: Number, default: 0 },   // tannarx (biz to'laymiz)
+  uzRate: { type: Number, default: 0 },    // sotuv narxi (mijoz to'laydi)
   kzCode: String,
+  kzCost: { type: Number, default: 0 },
   kzRate: { type: Number, default: 0 },
   ogirlik: { type: Number, default: 0 },
 
   // Fixed USD debts
   avgCode: String,
+  avgCost: { type: Number, default: 0 },
   avgExpense: { type: Number, default: 0 },
   prastoy: { type: Number, default: 0 },
 
@@ -51,12 +54,27 @@ deliverySchema.virtual('effectiveWeight').get(function () {
   return Math.max(0, (this.cargoWeight || 0) - (this.ogirlik || 0));
 });
 
+// Selling totals (what customer pays)
 deliverySchema.virtual('uzTotal').get(function () {
   return (this.uzRate || 0) * this.effectiveWeight;
 });
 
 deliverySchema.virtual('kzTotal').get(function () {
   return (this.kzRate || 0) * this.effectiveWeight;
+});
+
+// Cost totals (what we pay — tannarx)
+deliverySchema.virtual('uzCostTotal').get(function () {
+  return (this.uzCost || 0) * this.effectiveWeight;
+});
+
+deliverySchema.virtual('kzCostTotal').get(function () {
+  return (this.kzCost || 0) * this.effectiveWeight;
+});
+
+// Total cost = tannarx
+deliverySchema.virtual('totalCost').get(function () {
+  return this.uzCostTotal + this.kzCostTotal + (this.avgCost || 0) + (this.prastoy || 0) + this.totalExpenses;
 });
 
 // Total expenses sum
@@ -89,9 +107,9 @@ deliverySchema.virtual('supplierDebt').get(function () {
   return Math.max(0, this.totalDebt - this.supplierPaid);
 });
 
-// Profit = customer paid - totalDebt
+// Profit = sotuv narxi - tannarx (per delivery)
 deliverySchema.virtual('profit').get(function () {
-  return this.paidAmount - this.totalDebt;
+  return this.totalDebt - this.totalCost;
 });
 
 // 'tolanmagan' | 'qisman' | 'toliq'

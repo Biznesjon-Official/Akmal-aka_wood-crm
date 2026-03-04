@@ -331,12 +331,17 @@ export default function Deliveries() {
 
           <div style={{ marginTop: 8, padding: '8px 0', borderTop: '1px solid #f0f0f0' }}>
             <Descriptions size="small" column={2} labelStyle={{ color: '#888', fontSize: 11 }} contentStyle={{ fontSize: 11, fontWeight: 600 }}>
-              {d.uzRate > 0 && <Descriptions.Item label={d.uzCode ? `UZ (${d.uzCode})` : 'UZ'}>${d.uzRate}/t</Descriptions.Item>}
-              {d.kzRate > 0 && <Descriptions.Item label={d.kzCode ? `KZ (${d.kzCode})` : 'KZ'}>${d.kzRate}/t</Descriptions.Item>}
-              {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+              {d.uzRate > 0 && <Descriptions.Item label={d.uzCode ? `UZ (${d.uzCode})` : 'UZ'}>${d.uzCost || 0} → ${d.uzRate}/t</Descriptions.Item>}
+              {d.kzRate > 0 && <Descriptions.Item label={d.kzCode ? `KZ (${d.kzCode})` : 'KZ'}>${d.kzCost || 0} → ${d.kzRate}/t</Descriptions.Item>}
+              {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgCost || 0, 'USD')} → {formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
               {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
               {d.totalExpenses > 0 && <Descriptions.Item label="Xarajatlar">{formatMoney(d.totalExpenses, 'USD')}</Descriptions.Item>}
             </Descriptions>
+            {d.profit !== 0 && (
+              <div style={{ fontSize: 12, marginTop: 4, color: d.profit >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>
+                Foyda: {d.profit >= 0 ? '+' : ''}{formatMoney(d.profit, 'USD')}
+              </div>
+            )}
             <div style={{ marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
                 <span style={{ color: DEBT_COLOR[d.debtStatus] }}>{DEBT_LABEL[d.debtStatus]}</span>
@@ -388,17 +393,30 @@ export default function Deliveries() {
                 {d.cargoType && <Descriptions.Item label={t('cargo')}>{d.cargoType}</Descriptions.Item>}
                 {d.cargoWeight > 0 && <Descriptions.Item label={t('weight')}>{d.cargoWeight} t</Descriptions.Item>}
               </Descriptions>
-              <Descriptions bordered size="small" column={3} style={{ marginBottom: 16 }}>
-                {d.uzRate > 0 && <Descriptions.Item label={`UZ${d.uzCode ? ` (${d.uzCode})` : ''}`}>${d.uzRate}/t</Descriptions.Item>}
-                {d.kzRate > 0 && <Descriptions.Item label={`KZ${d.kzCode ? ` (${d.kzCode})` : ''}`}>${d.kzRate}/t</Descriptions.Item>}
-                {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
-                {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
-                {d.totalExpenses > 0 && <Descriptions.Item label="Qo'shimcha xarajatlar">{formatMoney(d.totalExpenses, 'USD')}</Descriptions.Item>}
-              </Descriptions>
+              {(d.uzRate > 0 || d.kzRate > 0 || d.avgExpense > 0 || d.prastoy > 0) && (
+                <Table size="small" bordered pagination={false} style={{ marginBottom: 16 }}
+                  dataSource={[
+                    ...(d.uzRate > 0 || d.uzCost > 0 ? [{ key: 'uz', name: `UZ${d.uzCode ? ` (${d.uzCode})` : ''}`, cost: `$${d.uzCost || 0}/t`, sell: `$${d.uzRate}/t`, costTotal: d.uzCostTotal, sellTotal: d.uzTotal }] : []),
+                    ...(d.kzRate > 0 || d.kzCost > 0 ? [{ key: 'kz', name: `KZ${d.kzCode ? ` (${d.kzCode})` : ''}`, cost: `$${d.kzCost || 0}/t`, sell: `$${d.kzRate}/t`, costTotal: d.kzCostTotal, sellTotal: d.kzTotal }] : []),
+                    ...(d.avgExpense > 0 || d.avgCost > 0 ? [{ key: 'avg', name: `AVG${d.avgCode ? ` (${d.avgCode})` : ''}`, cost: formatMoney(d.avgCost || 0, 'USD'), sell: formatMoney(d.avgExpense, 'USD'), costTotal: d.avgCost || 0, sellTotal: d.avgExpense }] : []),
+                    ...(d.prastoy > 0 ? [{ key: 'pr', name: 'Prastoy', cost: formatMoney(d.prastoy, 'USD'), sell: formatMoney(d.prastoy, 'USD'), costTotal: d.prastoy, sellTotal: d.prastoy }] : []),
+                  ]}
+                  columns={[
+                    { title: '', dataIndex: 'name', key: 'name', width: 100 },
+                    { title: 'Tannarx', dataIndex: 'cost', key: 'cost' },
+                    { title: 'Sotuv', dataIndex: 'sell', key: 'sell' },
+                    { title: 'Foyda', key: 'profit', render: (_, r) => {
+                      const p = r.sellTotal - r.costTotal;
+                      return <Text style={{ color: p >= 0 ? '#52c41a' : '#ff4d4f', fontWeight: 600 }}>{p >= 0 ? '+' : ''}{formatMoney(p, 'USD')}</Text>;
+                    }},
+                  ]}
+                />
+              )}
               <Row gutter={16} style={{ marginBottom: 12 }}>
-                <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(d.totalDebt, 'USD')}</Text></Col>
-                <Col span={8}><Text type="secondary">Mijoz to'ladi</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(d.paidAmount, 'USD')}</Text></Col>
-                <Col span={8}><Text type="secondary">Mijoz qoldiq</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.remainingDebt, 'USD')}</Text></Col>
+                <Col span={6}><Text type="secondary">Tannarx</Text><br /><Text strong>{formatMoney(d.totalCost, 'USD')}</Text></Col>
+                <Col span={6}><Text type="secondary">Sotuv</Text><br /><Text strong style={{ color: '#d46b08' }}>{formatMoney(d.totalDebt, 'USD')}</Text></Col>
+                <Col span={6}><Text type="secondary">Foyda</Text><br /><Text strong style={{ color: d.profit >= 0 ? '#52c41a' : '#ff4d4f' }}>{d.profit >= 0 ? '+' : ''}{formatMoney(d.profit, 'USD')}</Text></Col>
+                <Col span={6}><Text type="secondary">Mijoz qoldiq</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.remainingDebt, 'USD')}</Text></Col>
               </Row>
               <Progress percent={pct} strokeColor={DEBT_COLOR[d.debtStatus]} />
               {d.sender && (
@@ -689,46 +707,61 @@ export default function Deliveries() {
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
+          <Row gutter={8}>
+            <Col span={8}>
               <Form.Item name="uzCode" label="UZ kodi" style={{ marginBottom: 8 }}>
-                <Input placeholder="Kod raqami" />
+                <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="uzRate" label="UZ (USD/t)" style={{ marginBottom: 8 }}>
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+            <Col span={8}>
+              <Form.Item name="uzCost" label="UZ tannarx ($/t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="uzRate" label="UZ sotuv ($/t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
+          <Row gutter={8}>
+            <Col span={8}>
               <Form.Item name="kzCode" label="KZ kodi" style={{ marginBottom: 8 }}>
-                <Input placeholder="Kod raqami" />
+                <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="kzRate" label="KZ (USD/t)" style={{ marginBottom: 8 }}>
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+            <Col span={8}>
+              <Form.Item name="kzCost" label="KZ tannarx ($/t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="kzRate" label="KZ sotuv ($/t)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
+          <Row gutter={8}>
+            <Col span={8}>
               <Form.Item name="avgCode" label="AVG kodi" style={{ marginBottom: 8 }}>
-                <Input placeholder="Kod raqami" />
+                <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={12}>
-              <Form.Item name="avgExpense" label="AVG summa (USD)" style={{ marginBottom: 8 }}>
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+            <Col span={8}>
+              <Form.Item name="avgCost" label="AVG tannarx ($)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item name="avgExpense" label="AVG sotuv ($)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
           </Row>
-          <Row gutter={12}>
-            <Col span={12}>
-              <Form.Item name="prastoy" label="Prastoy (USD)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+          <Row gutter={8}>
+            <Col span={8}>
+              <Form.Item name="prastoy" label="Prastoy ($)">
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
           </Row>
@@ -739,12 +772,19 @@ export default function Deliveries() {
               const weight = form.getFieldValue('cargoWeight') || 0;
               const loss = form.getFieldValue('ogirlik') || 0;
               const eff = Math.max(0, weight - loss);
-              const uz = (form.getFieldValue('uzRate') || 0) * eff;
-              const kz = (form.getFieldValue('kzRate') || 0) * eff;
-              const avg = form.getFieldValue('avgExpense') || 0;
+              // Sotuv (mijoz to'laydi)
+              const uzSell = (form.getFieldValue('uzRate') || 0) * eff;
+              const kzSell = (form.getFieldValue('kzRate') || 0) * eff;
+              const avgSell = form.getFieldValue('avgExpense') || 0;
               const pr = form.getFieldValue('prastoy') || 0;
-              const total = uz + kz + avg + pr;
-              if (!total) return null;
+              const totalSell = uzSell + kzSell + avgSell + pr;
+              // Tannarx (biz to'laymiz)
+              const uzCost = (form.getFieldValue('uzCost') || 0) * eff;
+              const kzCost = (form.getFieldValue('kzCost') || 0) * eff;
+              const avgCost = form.getFieldValue('avgCost') || 0;
+              const totalCost = uzCost + kzCost + avgCost + pr;
+              const profit = totalSell - totalCost;
+              if (!totalSell && !totalCost) return null;
               return (
                 <Card size="small" style={{ background: '#fff7e6' }}>
                   {eff !== weight && weight > 0 && (
@@ -752,15 +792,28 @@ export default function Deliveries() {
                       {t('effectiveWeight')} {weight} − {loss} = <strong>{eff} t</strong>
                     </div>
                   )}
-                  <Row gutter={8}>
-                    {uz > 0 && <Col span={12}><Text type="secondary">UZ: </Text><Text strong>{formatMoney(uz, 'USD')}</Text></Col>}
-                    {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
-                    {avg > 0 && <Col span={12}><Text type="secondary">AVG{form.getFieldValue('avgCode') ? ` (${form.getFieldValue('avgCode')})` : ''}: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
-                    {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
+                  <Table size="small" pagination={false} bordered
+                    dataSource={[
+                      ...(uzSell > 0 || uzCost > 0 ? [{ key: 'uz', name: `UZ${form.getFieldValue('uzCode') ? ` (${form.getFieldValue('uzCode')})` : ''}`, cost: uzCost, sell: uzSell }] : []),
+                      ...(kzSell > 0 || kzCost > 0 ? [{ key: 'kz', name: `KZ${form.getFieldValue('kzCode') ? ` (${form.getFieldValue('kzCode')})` : ''}`, cost: kzCost, sell: kzSell }] : []),
+                      ...(avgSell > 0 || avgCost > 0 ? [{ key: 'avg', name: `AVG${form.getFieldValue('avgCode') ? ` (${form.getFieldValue('avgCode')})` : ''}`, cost: avgCost, sell: avgSell }] : []),
+                      ...(pr > 0 ? [{ key: 'pr', name: 'Prastoy', cost: pr, sell: pr }] : []),
+                    ]}
+                    columns={[
+                      { title: '', dataIndex: 'name', key: 'name', width: 100 },
+                      { title: 'Tannarx', dataIndex: 'cost', key: 'cost', render: (v) => formatMoney(v, 'USD') },
+                      { title: 'Sotuv', dataIndex: 'sell', key: 'sell', render: (v) => formatMoney(v, 'USD') },
+                      { title: 'Foyda', key: 'profit', render: (_, r) => {
+                        const p = r.sell - r.cost;
+                        return <Text style={{ color: p >= 0 ? '#52c41a' : '#ff4d4f' }}>{p >= 0 ? '+' : ''}{formatMoney(p, 'USD')}</Text>;
+                      }},
+                    ]}
+                  />
+                  <Row gutter={16} style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
+                    <Col span={8}>Tannarx: <Text strong>{formatMoney(totalCost, 'USD')}</Text></Col>
+                    <Col span={8}>Sotuv: <Text strong style={{ color: '#d46b08' }}>{formatMoney(totalSell, 'USD')}</Text></Col>
+                    <Col span={8}>Foyda: <Text strong style={{ color: profit >= 0 ? '#52c41a' : '#ff4d4f' }}>{profit >= 0 ? '+' : ''}{formatMoney(profit, 'USD')}</Text></Col>
                   </Row>
-                  <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
-                    {t('customerDebt2')} <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
-                  </div>
                 </Card>
               );
             }}
