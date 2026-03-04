@@ -29,7 +29,19 @@ const Customers = () => {
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
-    queryFn: getCustomers,
+    queryFn: () => getCustomers({ customerType: 'customer' }),
+  });
+
+  const { data: afghans, isLoading: afghansLoading } = useQuery({
+    queryKey: ['afghans'],
+    queryFn: () => getCustomers({ customerType: 'afghan' }),
+    enabled: pageTab === 'afghans',
+  });
+
+  const { data: ozimList, isLoading: ozimLoading } = useQuery({
+    queryKey: ['ozim-customers'],
+    queryFn: () => getCustomers({ customerType: 'ozim' }),
+    enabled: pageTab === 'ozim',
   });
 
   const { data: debtors, isLoading: debtorsLoading } = useQuery({
@@ -89,6 +101,8 @@ const Customers = () => {
     mutationFn: createCustomer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['afghans'] });
+      queryClient.invalidateQueries({ queryKey: ['ozim-customers'] });
       message.success(t('customerAdded'));
       closeModal();
     },
@@ -99,6 +113,8 @@ const Customers = () => {
     mutationFn: ({ id, data }) => updateCustomer(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['afghans'] });
+      queryClient.invalidateQueries({ queryKey: ['ozim-customers'] });
       message.success(t('customerUpdated'));
       closeModal();
     },
@@ -109,6 +125,8 @@ const Customers = () => {
     mutationFn: deleteCustomer,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['afghans'] });
+      queryClient.invalidateQueries({ queryKey: ['ozim-customers'] });
       message.success(t('customerDeleted'));
     },
     onError: () => message.error(t('error')),
@@ -178,9 +196,10 @@ const Customers = () => {
     } catch { /* validation */ }
   };
 
-  const openCreate = () => {
+  const openCreate = (type = 'customer') => {
     setEditingCustomer(null);
     form.resetFields();
+    form.setFieldsValue({ customerType: type });
     setModalOpen(true);
   };
 
@@ -357,7 +376,8 @@ const Customers = () => {
     },
   ];
 
-  const filteredCustomers = (customers || []).filter(c => !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
+  const currentList = pageTab === 'afghans' ? (afghans || []) : pageTab === 'ozim' ? (ozimList || []) : (customers || []);
+  const filteredCustomers = currentList.filter(c => !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
 
   const renderCustomerCards = () => (
     <Row gutter={[16, 16]}>
@@ -445,7 +465,7 @@ const Customers = () => {
                     <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
                       Astatka qo&apos;shish
                     </Button>
-                    <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate('customer')}>
                       {t('addCustomer')}
                     </Button>
                   </Space>
@@ -468,6 +488,96 @@ const Customers = () => {
                   <Table rowKey="_id" columns={columns}
                     dataSource={filteredCustomers}
                     loading={isLoading}
+                    onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+                  />
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'afghans',
+            label: `${t('afghans')} (${(afghans || []).length})`,
+            children: (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <Space wrap>
+                    <Segmented value={viewMode} onChange={setViewMode}
+                      options={[
+                        { value: 'card', icon: <AppstoreOutlined /> },
+                        { value: 'table', icon: <BarsOutlined /> },
+                      ]} />
+                    <Input
+                      placeholder={t('search') || 'Qidirish...'}
+                      prefix={<SearchOutlined />}
+                      allowClear
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{ width: 200 }}
+                    />
+                  </Space>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate('afghan')}>
+                    {t('addAfghan')}
+                  </Button>
+                </div>
+
+                <Card className="summary-card" style={{ marginBottom: 16 }}>
+                  <div className="summary-stats">
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">{t('totalAfghans')}</span>
+                      <span className="summary-stat-value highlight">{(afghans || []).length}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {viewMode === 'card' ? renderCustomerCards() : (
+                  <Table rowKey="_id" columns={columns}
+                    dataSource={filteredCustomers}
+                    loading={afghansLoading}
+                    onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+                  />
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'ozim',
+            label: `${t('ozim')} (${(ozimList || []).length})`,
+            children: (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <Space wrap>
+                    <Segmented value={viewMode} onChange={setViewMode}
+                      options={[
+                        { value: 'card', icon: <AppstoreOutlined /> },
+                        { value: 'table', icon: <BarsOutlined /> },
+                      ]} />
+                    <Input
+                      placeholder={t('search') || 'Qidirish...'}
+                      prefix={<SearchOutlined />}
+                      allowClear
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{ width: 200 }}
+                    />
+                  </Space>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate('ozim')}>
+                    {t('addOzim')}
+                  </Button>
+                </div>
+
+                <Card className="summary-card" style={{ marginBottom: 16 }}>
+                  <div className="summary-stats">
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">{t('totalOzim')}</span>
+                      <span className="summary-stat-value highlight">{(ozimList || []).length}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                {viewMode === 'card' ? renderCustomerCards() : (
+                  <Table rowKey="_id" columns={columns}
+                    dataSource={filteredCustomers}
+                    loading={ozimLoading}
                     onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
                   />
                 )}
@@ -515,6 +625,7 @@ const Customers = () => {
         okText={t('save')} cancelText={t('cancel')}
       >
         <Form form={form} layout="vertical">
+          <Form.Item name="customerType" hidden><Input /></Form.Item>
           <Form.Item name="name" label={t('name')} rules={[{ required: true, message: t('enterName') }]}>
             <Input />
           </Form.Item>

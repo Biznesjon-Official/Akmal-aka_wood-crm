@@ -4,7 +4,9 @@ const Payment = require('../models/Payment');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const customers = await Customer.find().sort({ createdAt: -1 }).lean();
+    const filter = {};
+    if (req.query.customerType) filter.customerType = req.query.customerType;
+    const customers = await Customer.find(filter).sort({ createdAt: -1 }).lean();
     res.json(customers);
   } catch (err) { next(err); }
 };

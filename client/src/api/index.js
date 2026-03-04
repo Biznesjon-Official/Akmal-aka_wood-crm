@@ -26,7 +26,7 @@ export const addWagonExpense = (id, data) =>
   api.post(`/wagons/${id}/add-expense`, data).then((r) => r.data);
 
 // Customers
-export const getCustomers = () => api.get("/customers").then((r) => r.data);
+export const getCustomers = (params) => api.get("/customers", { params }).then((r) => r.data);
 export const getCustomer = (id) =>
   api.get(`/customers/${id}`).then((r) => r.data);
 export const createCustomer = (data) =>

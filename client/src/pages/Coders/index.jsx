@@ -36,6 +36,7 @@ export default function Coders() {
   const [wagonOrigin, setWagonOrigin] = useState('');
   const [wagonDestination, setWagonDestination] = useState('');
   const [wagonSupplier, setWagonSupplier] = useState(null);
+  const [wagonCustomer, setWagonCustomer] = useState(null);
   const [bundles, setBundles] = useState([]);
   const [wagonErrors, setWagonErrors] = useState({});
 
@@ -60,7 +61,8 @@ export default function Coders() {
   const [dlvErrors, setDlvErrors] = useState({});
 
   const { data: coders = [] } = useQuery({ queryKey: ['coders'], queryFn: getCoders });
-  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
+  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: () => getCustomers() });
+  const { data: ozimCustomers = [] } = useQuery({ queryKey: ['ozim-customers'], queryFn: () => getCustomers({ customerType: 'ozim' }) });
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
 
   const selectedCoderId = activeTab || coders[0]?._id;
@@ -162,6 +164,7 @@ export default function Coders() {
     setWagonOrigin('');
     setWagonDestination('');
     setWagonSupplier(null);
+    setWagonCustomer(null);
     setBundles([]);
     setWagonErrors({});
   };
@@ -203,6 +206,7 @@ export default function Coders() {
       origin: wagonOrigin || undefined,
       destination: wagonDestination || undefined,
       supplier: wagonSupplier || undefined,
+      customer: wagonCustomer || undefined,
       sentDate: wagonSentDate?.toISOString() || null,
       woodBundles: bundles.filter(b => b.thickness && b.width && b.length && b.count),
       coder: selectedCoderId,
@@ -412,6 +416,15 @@ export default function Coders() {
                     <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
                       value={wagonSupplier} onChange={setWagonSupplier}
                       options={suppliers.map(s => ({ value: s._id, label: s.name }))} />
+                  </td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={labelS}>O&apos;zim (Mijoz)</td>
+                  <td style={cellS}>
+                    <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
+                      value={wagonCustomer} onChange={setWagonCustomer}
+                      showSearch optionFilterProp="label"
+                      options={ozimCustomers.map(c => ({ value: c._id, label: c.name }))} />
                   </td>
                 </tr>
               </tbody>

@@ -3,7 +3,8 @@ const mongoose = require('mongoose');
 const customerSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   phone: { type: String, trim: true },
-  note: { type: String, trim: true }
+  note: { type: String, trim: true },
+  customerType: { type: String, enum: ['customer', 'afghan', 'ozim'], default: 'customer' }
 }, { timestamps: true });
 
 customerSchema.index({ createdAt: -1 });

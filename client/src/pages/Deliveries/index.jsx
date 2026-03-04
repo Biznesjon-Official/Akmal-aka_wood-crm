@@ -253,20 +253,48 @@ export default function Deliveries() {
       ),
     },
     {
-      title: t('cargo'), key: 'cargo',
-      render: (_, r) => r.cargoType ? (
+      title: t('weight'), key: 'weight',
+      render: (_, r) => r.cargoWeight ? (
         <div style={{ fontSize: 12 }}>
-          <div>{r.cargoType}</div>
-          {r.cargoWeight && <div style={{ color: '#888' }}>{r.cargoWeight} t</div>}
+          <div>{r.cargoWeight} t</div>
+          {r.ogirlik > 0 && <div style={{ color: '#ff4d4f' }}>-{r.ogirlik} t</div>}
+          {r.ogirlik > 0 && <div style={{ fontWeight: 600 }}>{r.effectiveWeight} t</div>}
         </div>
       ) : '—',
     },
     {
-      title: t('status'), dataIndex: 'status', key: 'status',
-      render: (v) => <Tag color={STATUS_COLOR[v]}>{STATUS_LABEL[v]}</Tag>,
+      title: 'UZ', key: 'uz',
+      render: (_, r) => (r.uzCost > 0 || r.uzRate > 0) ? (
+        <div style={{ fontSize: 11 }}>
+          {r.uzCode && <div style={{ color: '#888' }}>{r.uzCode}</div>}
+          <div><Text type="secondary">${r.uzCost || 0}</Text> → <Text strong>${r.uzRate || 0}</Text>/t</div>
+        </div>
+      ) : '—',
     },
     {
-      title: t('totalDebt3'), key: 'totalDebt',
+      title: 'KZ', key: 'kz',
+      render: (_, r) => (r.kzCost > 0 || r.kzRate > 0) ? (
+        <div style={{ fontSize: 11 }}>
+          {r.kzCode && <div style={{ color: '#888' }}>{r.kzCode}</div>}
+          <div><Text type="secondary">${r.kzCost || 0}</Text> → <Text strong>${r.kzRate || 0}</Text>/t</div>
+        </div>
+      ) : '—',
+    },
+    {
+      title: 'AVG', key: 'avg',
+      render: (_, r) => (r.avgCost > 0 || r.avgExpense > 0) ? (
+        <div style={{ fontSize: 11 }}>
+          {r.avgCode && <div style={{ color: '#888' }}>{r.avgCode}</div>}
+          <div><Text type="secondary">${r.avgCost || 0}</Text> → <Text strong>${r.avgExpense || 0}</Text></div>
+        </div>
+      ) : '—',
+    },
+    {
+      title: t('costPrice'), key: 'tannarx',
+      render: (_, r) => <Text>{formatMoney(r.totalCost, 'USD')}</Text>,
+    },
+    {
+      title: t('sell'), key: 'sotuv',
       render: (_, r) => <Text strong>{formatMoney(r.totalDebt, 'USD')}</Text>,
     },
     {
