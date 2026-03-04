@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import {
   Button, Modal, Form, InputNumber, Select, DatePicker,
-  Input, message, Tag, Typography, Space, Spin, Card, Tabs, Popconfirm,
-  Row, Col, Progress, Timeline, Empty,
+  Input, message, Tag, Typography, Space, Card, Tabs, Popconfirm,
+  Table, Progress, Timeline, Empty,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,7 +17,7 @@ import { useLanguage } from '../../context/LanguageContext';
 const { Text, Title } = Typography;
 
 
-// ─── Mening qarzdorligim (card-based) ───
+// ─── Mening qarzdorligim (table-based) ───
 function MyDebtsSection() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -112,120 +112,45 @@ function MyDebtsSection() {
     setHistoryModalOpen(true);
   };
 
-  if (isLoading) {
-    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
-  }
+  const filtered = debts.filter(d => !search || d.creditor?.toLowerCase().includes(search.toLowerCase()));
+
+  const columns = [
+    { title: t('toWhom'), dataIndex: 'creditor', key: 'creditor', render: (v) => <Text strong>{v}</Text> },
+    { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
+    { title: t('paidAmount2'), dataIndex: 'paidAmount', key: 'paidAmount', render: (v, r) => <Text style={{ color: '#52c41a' }}>{formatMoney(v, r.currency)}</Text> },
+    { title: t('remainingAmount'), dataIndex: 'remainingDebt', key: 'remainingDebt', render: (v, r) => v > 0 ? <Text type="danger" strong>{formatMoney(v, r.currency)}</Text> : <Tag color="green">{t('paidStatus')}</Tag> },
+    {
+      title: '', key: 'progress', width: 120,
+      render: (_, r) => <Progress percent={r.amount > 0 ? Math.round((r.paidAmount / r.amount) * 100) : 0} size="small" strokeColor={r.remainingDebt <= 0 ? '#52c41a' : '#fa8c16'} />,
+    },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
+    { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+    {
+      title: t('actions'), key: 'actions', width: 160,
+      render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<DollarOutlined />} disabled={r.remainingDebt <= 0} onClick={(e) => { e.stopPropagation(); handlePay(r); }}>{t('pay')}</Button>
+          <Button size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(r); }} />
+          <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMutation.mutate(r._id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   return (
     <>
-      <Card style={{ marginBottom: 16 }}>
-        <Space size="large" align="center" wrap>
-          <Title level={4} style={{ margin: 0 }}>{t('myDebtsTitle')}</Title>
-          <Input
-            placeholder="Qidirish..."
-            prefix={<SearchOutlined />}
-            allowClear
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 180 }}
-          />
-          {totalUSD > 0 && (
-            <Tag color="orange" style={{ fontSize: 16, padding: '4px 12px' }}>
-              {t('total')}: {formatMoney(totalUSD, 'USD')}
-            </Tag>
-          )}
-          {totalRUB > 0 && (
-            <Tag color="orange" style={{ fontSize: 16, padding: '4px 12px' }}>
-              {t('total')}: {formatMoney(totalRUB, 'RUB')}
-            </Tag>
-          )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>
-            {t('addDebt')}
-          </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
+          <Input placeholder="Qidirish..." prefix={<SearchOutlined />} allowClear value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 200 }} />
+          {totalUSD > 0 && <Tag color="orange" style={{ fontSize: 14, padding: '2px 10px' }}>{t('total')}: {formatMoney(totalUSD, 'USD')}</Tag>}
+          {totalRUB > 0 && <Tag color="orange" style={{ fontSize: 14, padding: '2px 10px' }}>{t('total')}: {formatMoney(totalRUB, 'RUB')}</Tag>}
         </Space>
-      </Card>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>{t('addDebt')}</Button>
+      </div>
 
-      {debts.length === 0 ? (
-        <Empty description={t('noDebts')} />
-      ) : (
-        <Row gutter={[16, 16]}>
-          {debts.filter(d => !search || d.creditor?.toLowerCase().includes(search.toLowerCase())).map((debt) => {
-            const percent = debt.amount > 0 ? Math.round((debt.paidAmount / debt.amount) * 100) : 0;
-            const isDone = debt.remainingDebt <= 0;
-            return (
-              <Col xs={24} sm={12} lg={8} key={debt._id}>
-                <Card
-                  size="small"
-                  style={{
-                    borderLeft: `4px solid ${isDone ? '#52c41a' : '#fa8c16'}`,
-                    opacity: isDone ? 0.7 : 1,
-                  }}
-                  actions={[
-                    <Button
-                      type="link"
-                      icon={<DollarOutlined />}
-                      disabled={isDone}
-                      onClick={() => handlePay(debt)}
-                      key="pay"
-                    >
-                      {t('pay')}
-                    </Button>,
-                    <Button
-                      type="link"
-                      icon={<EyeOutlined />}
-                      onClick={() => handleViewHistory(debt)}
-                      key="view"
-                    >
-                      {t('history')} ({debt.payments?.length || 0})
-                    </Button>,
-                    <Popconfirm
-                      title={t('deleteConfirm')}
-                      onConfirm={() => deleteMutation.mutate(debt._id)}
-                      key="delete"
-                    >
-                      <Button type="link" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>,
-                  ]}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: 16 }}>{debt.creditor}</Text>
-                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>{t('paidStatus')}</Tag>}
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('debtAmount')}</Text>
-                      <Text strong>{formatMoney(debt.amount, debt.currency)}</Text>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('paidAmount2')}</Text>
-                      <Text style={{ color: '#52c41a' }} strong>{formatMoney(debt.paidAmount, debt.currency)}</Text>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('remainingAmount')}</Text>
-                      <Text type="danger" strong>{formatMoney(debt.remainingDebt, debt.currency)}</Text>
-                    </div>
-                  </div>
-
-                  <Progress
-                    percent={percent}
-                    size="small"
-                    strokeColor={isDone ? '#52c41a' : '#fa8c16'}
-                    format={(p) => `${p}%`}
-                  />
-
-                  <div style={{ marginTop: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {formatDate(debt.date)}
-                      {debt.description && ` · ${debt.description}`}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
-      )}
+      <Table rowKey="_id" columns={columns} dataSource={filtered} loading={isLoading} size="small" pagination={false} />
 
       {/* Create debt modal */}
       <Modal
@@ -338,7 +263,7 @@ function MyDebtsSection() {
   );
 }
 
-// ─── Mendan qarzdarlar (I lent money to someone) ───
+// ─── Mendan qarzdarlar (table-based) ───
 function LentDebtsSection() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
@@ -433,120 +358,45 @@ function LentDebtsSection() {
     setHistoryModalOpen(true);
   };
 
-  if (isLoading) {
-    return <div style={{ textAlign: 'center', padding: 80 }}><Spin size="large" /></div>;
-  }
+  const filtered = debts.filter(d => !search || d.debtor?.toLowerCase().includes(search.toLowerCase()));
+
+  const columns = [
+    { title: 'Kimga', dataIndex: 'debtor', key: 'debtor', render: (v) => <Text strong>{v}</Text> },
+    { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
+    { title: t('returned'), dataIndex: 'paidAmount', key: 'paidAmount', render: (v, r) => <Text style={{ color: '#52c41a' }}>{formatMoney(v, r.currency)}</Text> },
+    { title: t('remainingAmount'), dataIndex: 'remainingDebt', key: 'remainingDebt', render: (v, r) => v > 0 ? <Text type="danger" strong>{formatMoney(v, r.currency)}</Text> : <Tag color="green">{t('returnedStatus')}</Tag> },
+    {
+      title: '', key: 'progress', width: 120,
+      render: (_, r) => <Progress percent={r.amount > 0 ? Math.round((r.paidAmount / r.amount) * 100) : 0} size="small" strokeColor={r.remainingDebt <= 0 ? '#52c41a' : '#1677ff'} />,
+    },
+    { title: t('date'), dataIndex: 'date', key: 'date', render: (v) => formatDate(v) },
+    { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+    {
+      title: t('actions'), key: 'actions', width: 160,
+      render: (_, r) => (
+        <Space>
+          <Button size="small" icon={<DollarOutlined />} disabled={r.remainingDebt <= 0} onClick={(e) => { e.stopPropagation(); handlePay(r); }}>Olish</Button>
+          <Button size="small" icon={<EyeOutlined />} onClick={(e) => { e.stopPropagation(); handleViewHistory(r); }} />
+          <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMutation.mutate(r._id)}>
+            <Button size="small" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
   return (
     <>
-      <Card style={{ marginBottom: 16 }}>
-        <Space size="large" align="center" wrap>
-          <Title level={4} style={{ margin: 0 }}>{t('lentDebtsTitle')}</Title>
-          <Input
-            placeholder="Qidirish..."
-            prefix={<SearchOutlined />}
-            allowClear
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 180 }}
-          />
-          {totalUSD > 0 && (
-            <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
-              {t('total')}: {formatMoney(totalUSD, 'USD')}
-            </Tag>
-          )}
-          {totalRUB > 0 && (
-            <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
-              {t('total')}: {formatMoney(totalRUB, 'RUB')}
-            </Tag>
-          )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>
-            {t('giveDebt')}
-          </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
+          <Input placeholder="Qidirish..." prefix={<SearchOutlined />} allowClear value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 200 }} />
+          {totalUSD > 0 && <Tag color="blue" style={{ fontSize: 14, padding: '2px 10px' }}>{t('total')}: {formatMoney(totalUSD, 'USD')}</Tag>}
+          {totalRUB > 0 && <Tag color="blue" style={{ fontSize: 14, padding: '2px 10px' }}>{t('total')}: {formatMoney(totalRUB, 'RUB')}</Tag>}
         </Space>
-      </Card>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => { debtForm.resetFields(); setDebtModalOpen(true); }}>{t('giveDebt')}</Button>
+      </div>
 
-      {debts.length === 0 ? (
-        <Empty description={t('noLentDebts')} />
-      ) : (
-        <Row gutter={[16, 16]}>
-          {debts.filter(d => !search || d.debtor?.toLowerCase().includes(search.toLowerCase())).map((debt) => {
-            const percent = debt.amount > 0 ? Math.round((debt.paidAmount / debt.amount) * 100) : 0;
-            const isDone = debt.remainingDebt <= 0;
-            return (
-              <Col xs={24} sm={12} lg={8} key={debt._id}>
-                <Card
-                  size="small"
-                  style={{
-                    borderLeft: `4px solid ${isDone ? '#52c41a' : '#1677ff'}`,
-                    opacity: isDone ? 0.7 : 1,
-                  }}
-                  actions={[
-                    <Button
-                      type="link"
-                      icon={<DollarOutlined />}
-                      disabled={isDone}
-                      onClick={() => handlePay(debt)}
-                      key="pay"
-                    >
-                      Olish
-                    </Button>,
-                    <Button
-                      type="link"
-                      icon={<EyeOutlined />}
-                      onClick={() => handleViewHistory(debt)}
-                      key="view"
-                    >
-                      {t('history')} ({debt.payments?.length || 0})
-                    </Button>,
-                    <Popconfirm
-                      title={t('deleteConfirm')}
-                      onConfirm={() => deleteMutation.mutate(debt._id)}
-                      key="delete"
-                    >
-                      <Button type="link" danger icon={<DeleteOutlined />} />
-                    </Popconfirm>,
-                  ]}
-                >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text strong style={{ fontSize: 16 }}>{debt.debtor}</Text>
-                    {isDone && <Tag color="success" icon={<CheckCircleOutlined />}>{t('returnedStatus')}</Tag>}
-                  </div>
-
-                  <div style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('given')}</Text>
-                      <Text strong>{formatMoney(debt.amount, debt.currency)}</Text>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('returned')}</Text>
-                      <Text style={{ color: '#52c41a' }} strong>{formatMoney(debt.paidAmount, debt.currency)}</Text>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Text type="secondary">{t('remainingAmount')}</Text>
-                      <Text type="danger" strong>{formatMoney(debt.remainingDebt, debt.currency)}</Text>
-                    </div>
-                  </div>
-
-                  <Progress
-                    percent={percent}
-                    size="small"
-                    strokeColor={isDone ? '#52c41a' : '#1677ff'}
-                    format={(p) => `${p}%`}
-                  />
-
-                  <div style={{ marginTop: 4 }}>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {formatDate(debt.date)}
-                      {debt.description && ` · ${debt.description}`}
-                    </Text>
-                  </div>
-                </Card>
-              </Col>
-            );
-          })}
-        </Row>
-      )}
+      <Table rowKey="_id" columns={columns} dataSource={filtered} loading={isLoading} size="small" pagination={false} />
 
       {/* Create lent debt modal */}
       <Modal
