@@ -10,6 +10,7 @@ const deliverySchema = new mongoose.Schema({
   wagon: { type: mongoose.Schema.Types.ObjectId, ref: 'Wagon' },
   wagonCode: String,
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  sender: String,  // kimdan olayotgani
   sentDate: { type: Date, default: Date.now },
   arrivedDate: Date,
   status: { type: String, enum: ["yo'lda", 'yetkazildi', 'yakunlandi'], default: "yo'lda" },
@@ -26,7 +27,9 @@ const deliverySchema = new mongoose.Schema({
   ogirlik: { type: Number, default: 0 },  // weight loss (ton) — reduces effective weight for UZ & KZ
 
   // Fixed USD debts
+  avgCode: String,
   avgExpense: { type: Number, default: 0 },
+  kodCode: String,
   kodExpense: { type: Number, default: 0 },
   prastoy: { type: Number, default: 0 },
 

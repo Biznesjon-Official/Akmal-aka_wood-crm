@@ -121,6 +121,7 @@ export default function Deliveries() {
     form.setFieldsValue({
       ...record,
       wagonCode: record.wagonCode || '',
+      sender: record.sender || '',
       customerName: custName,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
       arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
@@ -179,7 +180,11 @@ export default function Deliveries() {
       render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v || '—'}</Text>,
     },
     {
-      title: t('customer'), key: 'customer',
+      title: 'Kimdan', dataIndex: 'sender', key: 'sender',
+      render: (v) => v || '—',
+    },
+    {
+      title: 'Kimga', key: 'customer',
       render: (_, r) => <Text>{r.customer?.name || '—'}</Text>,
     },
     {
@@ -262,7 +267,8 @@ export default function Deliveries() {
             <Text strong style={{ fontFamily: 'monospace' }}>{d.wagonCode || '—'}</Text>
             <Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag>
           </div>
-          <div style={{ color: '#555', fontSize: 13, marginBottom: 2 }}>{d.customer?.name || '—'}</div>
+          {d.sender && <div style={{ color: '#888', fontSize: 12 }}>Kimdan: {d.sender}</div>}
+          <div style={{ color: '#555', fontSize: 13, marginBottom: 2 }}>Kimga: {d.customer?.name || '—'}</div>
           {d.cargoType && <div style={{ color: '#888', fontSize: 12 }}>{d.cargoType}{d.cargoWeight ? ` — ${d.cargoWeight} t` : ''}</div>}
           <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>
             {formatDate(d.sentDate)}{d.arrivedDate && ` → ${formatDate(d.arrivedDate)}`}
@@ -272,8 +278,8 @@ export default function Deliveries() {
             <Descriptions size="small" column={2} labelStyle={{ color: '#888', fontSize: 11 }} contentStyle={{ fontSize: 11, fontWeight: 600 }}>
               {d.uzRate > 0 && <Descriptions.Item label={d.uzCode ? `UZ (${d.uzCode})` : 'UZ'}>${d.uzRate}/t</Descriptions.Item>}
               {d.kzRate > 0 && <Descriptions.Item label={d.kzCode ? `KZ (${d.kzCode})` : 'KZ'}>${d.kzRate}/t</Descriptions.Item>}
-              {d.avgExpense > 0 && <Descriptions.Item label="AVG">{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
-              {d.kodExpense > 0 && <Descriptions.Item label="Kod">{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
+              {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+              {d.kodExpense > 0 && <Descriptions.Item label={d.kodCode ? `Kod (${d.kodCode})` : 'Kod'}>{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
               {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
             </Descriptions>
             <div style={{ marginTop: 6 }}>
@@ -378,7 +384,8 @@ export default function Deliveries() {
             <>
               <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
                 <Descriptions.Item label={t('status')}><Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag></Descriptions.Item>
-                <Descriptions.Item label={t('customer')}>{d.customer?.name || '—'}</Descriptions.Item>
+                {d.sender && <Descriptions.Item label="Kimdan">{d.sender}</Descriptions.Item>}
+                <Descriptions.Item label="Kimga">{d.customer?.name || '—'}</Descriptions.Item>
                 <Descriptions.Item label={t('sentDateLabel')}>{formatDate(d.sentDate)}</Descriptions.Item>
                 <Descriptions.Item label={t('arrivedDateLabel')}>{d.arrivedDate ? formatDate(d.arrivedDate) : '—'}</Descriptions.Item>
                 {d.cargoType && <Descriptions.Item label={t('cargo')}>{d.cargoType}</Descriptions.Item>}
@@ -387,8 +394,8 @@ export default function Deliveries() {
               <Descriptions bordered size="small" column={3} style={{ marginBottom: 16 }}>
                 {d.uzRate > 0 && <Descriptions.Item label={`UZ${d.uzCode ? ` (${d.uzCode})` : ''}`}>${d.uzRate}/t</Descriptions.Item>}
                 {d.kzRate > 0 && <Descriptions.Item label={`KZ${d.kzCode ? ` (${d.kzCode})` : ''}`}>${d.kzRate}/t</Descriptions.Item>}
-                {d.avgExpense > 0 && <Descriptions.Item label="AVG">{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
-                {d.kodExpense > 0 && <Descriptions.Item label="Kod">{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
+                {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+                {d.kodExpense > 0 && <Descriptions.Item label={d.kodCode ? `Kod (${d.kodCode})` : 'Kod'}>{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
                 {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
               </Descriptions>
               <Row gutter={16} style={{ marginBottom: 12 }}>
@@ -434,7 +441,14 @@ export default function Deliveries() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="customerName" label={t('customer')} rules={[{ required: true, message: 'Mijoz nomini kiriting' }]}>
+              <Form.Item name="sender" label="Kimdan (jo'natuvchi)">
+                <Input placeholder="Kimdan olayotgani" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="customerName" label="Kimga (qabul qiluvchi)" rules={[{ required: true, message: 'Mijoz nomini kiriting' }]}>
                 <AutoComplete
                   options={customerOptions}
                   placeholder="Mijoz ismi"
@@ -448,12 +462,14 @@ export default function Deliveries() {
                 />
               </Form.Item>
             </Col>
+            {isNewCustomer && (
+              <Col span={12}>
+                <Form.Item name="customerPhone" label="Telefon (yangi mijoz)">
+                  <Input placeholder="+998 90 000 00 00" />
+                </Form.Item>
+              </Col>
+            )}
           </Row>
-          {isNewCustomer && (
-            <Form.Item name="customerPhone" label="Telefon (yangi mijoz uchun, ixtiyoriy)">
-              <Input placeholder="+998 90 000 00 00" />
-            </Form.Item>
-          )}
 
           <Row gutter={12}>
             <Col span={8}>
@@ -519,19 +535,33 @@ export default function Deliveries() {
             </Col>
           </Row>
           <Row gutter={12}>
-            <Col span={8}>
-              <Form.Item name="avgExpense" label="AVG (USD)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+            <Col span={12}>
+              <Form.Item name="avgCode" label="AVG kodi" style={{ marginBottom: 8 }}>
+                <Input placeholder="Kod raqami" />
               </Form.Item>
             </Col>
-            <Col span={8}>
-              <Form.Item name="kodExpense" label="Kod (USD)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+            <Col span={12}>
+              <Form.Item name="avgExpense" label="AVG summa (USD)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
+              <Form.Item name="kodCode" label="Kod raqami" style={{ marginBottom: 8 }}>
+                <Input placeholder="Kod raqami" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="kodExpense" label="Kod summa (USD)" style={{ marginBottom: 8 }}>
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Row gutter={12}>
+            <Col span={12}>
               <Form.Item name="prastoy" label="Prastoy (USD)">
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" />
+                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
               </Form.Item>
             </Col>
           </Row>
@@ -559,8 +589,8 @@ export default function Deliveries() {
                   <Row gutter={8}>
                     {uz > 0 && <Col span={12}><Text type="secondary">UZ: </Text><Text strong>{formatMoney(uz, 'USD')}</Text></Col>}
                     {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
-                    {avg > 0 && <Col span={12}><Text type="secondary">AVG: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
-                    {kod > 0 && <Col span={12}><Text type="secondary">Kod: </Text><Text strong>{formatMoney(kod, 'USD')}</Text></Col>}
+                    {avg > 0 && <Col span={12}><Text type="secondary">AVG{form.getFieldValue('avgCode') ? ` (${form.getFieldValue('avgCode')})` : ''}: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
+                    {kod > 0 && <Col span={12}><Text type="secondary">Kod{form.getFieldValue('kodCode') ? ` (${form.getFieldValue('kodCode')})` : ''}: </Text><Text strong>{formatMoney(kod, 'USD')}</Text></Col>}
                     {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
                   </Row>
                   <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
