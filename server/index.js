@@ -35,6 +35,7 @@ app.use('/api/deliveries', require('./routes/deliveries'));
 app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/coders', require('./routes/coders'));
 app.use('/api/auth', require('./routes/auth'));
+app.use('/api/partners', require('./routes/partners'));
 
 // Production: serve client build
 if (process.env.NODE_ENV === 'production') {

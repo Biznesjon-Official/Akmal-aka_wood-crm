@@ -180,6 +180,20 @@ export const deleteCoder = (id) =>
 export const getCoderCodes = (id) =>
   api.get(`/coders/${id}/codes`).then((r) => r.data);
 
+// Partners
+export const getPartners = () => api.get("/partners").then((r) => r.data);
+export const getPartner = (id) => api.get(`/partners/${id}`).then((r) => r.data);
+export const createPartner = (data) =>
+  api.post("/partners", data).then((r) => r.data);
+export const updatePartner = (id, data) =>
+  api.put(`/partners/${id}`, data).then((r) => r.data);
+export const deletePartner = (id) =>
+  api.delete(`/partners/${id}`).then((r) => r.data);
+export const addPartnerInvestment = (id, data) =>
+  api.post(`/partners/${id}/investments`, data).then((r) => r.data);
+export const removePartnerInvestment = (id, investmentId) =>
+  api.delete(`/partners/${id}/investments/${investmentId}`).then((r) => r.data);
+
 // Settings
 export const getExchangeRate = () =>
   api.get("/settings/exchange-rate").then((r) => r.data);
