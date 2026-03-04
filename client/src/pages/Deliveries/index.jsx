@@ -2,15 +2,17 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, AutoComplete,
-  message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress,
+  message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress, Tabs, Divider,
 } from 'antd';
 import {
-  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined, CreditCardOutlined, EyeOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined, CreditCardOutlined, EyeOutlined, MinusCircleOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getDeliveries, createDelivery, updateDelivery, deleteDelivery,
-  markDelivered, addDeliveryPayment, deleteDeliveryPayment, getCustomers, createCustomer,
+  markDelivered, addDeliveryPayment, deleteDeliveryPayment,
+  addDeliverySupplierPayment, deleteDeliverySupplierPayment,
+  getCustomers, createCustomer, getSuppliers, createSupplier,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
@@ -29,6 +31,7 @@ export default function Deliveries() {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [payTarget, setPayTarget] = useState(null);
+  const [payType, setPayType] = useState('customer'); // 'customer' | 'supplier'
   const [form] = Form.useForm();
   const [payForm] = Form.useForm();
   const [viewMode, setViewMode] = useState('table');
@@ -40,6 +43,7 @@ export default function Deliveries() {
   const [bulkCustomerId, setBulkCustomerId] = useState(null);
   const [bulkAmounts, setBulkAmounts] = useState({});
   const [bulkPayLoading, setBulkPayLoading] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState('');
 
   const STATUS_LABEL = {
     "yo'lda": t('onRoad'),
@@ -59,12 +63,18 @@ export default function Deliveries() {
   });
 
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
+  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
 
   const customerOptions = customers.map(c => ({ label: c.name, value: c.name, id: c._id }));
 
   const createCustomerMut = useMutation({
     mutationFn: createCustomer,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
+  });
+
+  const createSupplierMut = useMutation({
+    mutationFn: createSupplier,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['suppliers'] }),
   });
 
   const createMut = useMutation({
@@ -91,7 +101,7 @@ export default function Deliveries() {
 
   const payMut = useMutation({
     mutationFn: ({ id, data }) => addDeliveryPayment(id, data),
-    onSuccess: (updated) => { invalidate(); message.success(t('paymentAdded2')); setPayTarget(updated); payForm.resetFields(); },
+    onSuccess: (updated) => { invalidate(); message.success(t('paymentAdded2')); setPayTarget(updated); payForm.resetFields(); payForm.setFieldsValue({ date: dayjs() }); },
     onError: () => message.error(t('error')),
   });
 
@@ -101,15 +111,27 @@ export default function Deliveries() {
     onError: () => message.error(t('error')),
   });
 
+  const supplierPayMut = useMutation({
+    mutationFn: ({ id, data }) => addDeliverySupplierPayment(id, data),
+    onSuccess: (updated) => { invalidate(); message.success("Supplier to'lov qo'shildi"); setPayTarget(updated); payForm.resetFields(); payForm.setFieldsValue({ date: dayjs() }); },
+    onError: () => message.error(t('error')),
+  });
+
+  const deleteSupplierPayMut = useMutation({
+    mutationFn: ({ id, paymentId }) => deleteDeliverySupplierPayment(id, paymentId),
+    onSuccess: (updated) => { invalidate(); message.success(t('deleted')); setPayTarget(updated); },
+    onError: () => message.error(t('error')),
+  });
+
   const closeModal = () => {
     setModalOpen(false); setEditing(null);
-    form.resetFields(); setCustomerTyped(''); setIsNewCustomer(false);
+    form.resetFields(); setCustomerTyped(''); setIsNewCustomer(false); setNewSupplierName('');
   };
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ sentDate: dayjs() });
-    setEditing(null); setCustomerTyped(''); setIsNewCustomer(false);
+    form.setFieldsValue({ sentDate: dayjs(), expenses: [] });
+    setEditing(null); setCustomerTyped(''); setIsNewCustomer(false); setNewSupplierName('');
     setModalOpen(true);
   };
 
@@ -118,20 +140,24 @@ export default function Deliveries() {
     const custName = record.customer?.name || '';
     setCustomerTyped(custName);
     setIsNewCustomer(false);
+    setNewSupplierName('');
     form.setFieldsValue({
       ...record,
       wagonCode: record.wagonCode || '',
-      sender: record.sender || '',
+      sender: record.sender?._id || record.sender || undefined,
       customerName: custName,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
       arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
+      expenses: record.expenses || [],
     });
     setModalOpen(true);
   };
 
-  const openPay = (record) => {
+  const openPay = (record, type = 'customer') => {
     setPayTarget(record);
-    payForm.setFieldsValue({ date: dayjs(), amount: record.remainingDebt || 0 });
+    setPayType(type);
+    const remaining = type === 'customer' ? record.remainingDebt : record.supplierDebt;
+    payForm.setFieldsValue({ date: dayjs(), amount: remaining || 0 });
     setPayModalOpen(true);
   };
 
@@ -145,11 +171,7 @@ export default function Deliveries() {
         if (existing) {
           customerId = existing._id;
         } else {
-          // Create new customer
-          const newCust = await createCustomerMut.mutateAsync({
-            name,
-            phone: values.customerPhone || '',
-          });
+          const newCust = await createCustomerMut.mutateAsync({ name, phone: values.customerPhone || '' });
           customerId = newCust._id;
         }
       }
@@ -158,8 +180,10 @@ export default function Deliveries() {
         ...values,
         wagonCode: values.wagonCode || '',
         customer: customerId,
+        sender: values.sender || null,
         sentDate: values.sentDate?.toISOString(),
-        arrivedDate: values.arrivedDate?.toISOString(),
+        arrivedDate: values.arrivedDate?.toISOString() || null,
+        expenses: values.expenses || [],
       };
       delete data.customerName;
       delete data.customerPhone;
@@ -169,10 +193,21 @@ export default function Deliveries() {
     } catch { message.error(t('error')); }
   };
 
+  const handleAddNewSupplier = async () => {
+    if (!newSupplierName.trim()) return;
+    try {
+      const newSup = await createSupplierMut.mutateAsync({ name: newSupplierName.trim() });
+      form.setFieldsValue({ sender: newSup._id });
+      setNewSupplierName('');
+      message.success('Supplier yaratildi');
+    } catch { message.error(t('error')); }
+  };
+
   // Summary stats
   const totalDebt = deliveries.reduce((s, d) => s + (d.totalDebt || 0), 0);
   const totalPaid = deliveries.reduce((s, d) => s + (d.paidAmount || 0), 0);
   const totalRemaining = deliveries.reduce((s, d) => s + (d.remainingDebt || 0), 0);
+  const totalSupplierDebt = deliveries.reduce((s, d) => s + (d.supplierDebt || 0), 0);
 
   const columns = [
     {
@@ -180,8 +215,8 @@ export default function Deliveries() {
       render: (v) => <Text strong style={{ fontFamily: 'monospace' }}>{v || '—'}</Text>,
     },
     {
-      title: 'Kimdan', dataIndex: 'sender', key: 'sender',
-      render: (v) => v || '—',
+      title: 'Kimdan', key: 'sender',
+      render: (_, r) => r.sender?.name || '—',
     },
     {
       title: 'Kimga', key: 'customer',
@@ -229,26 +264,25 @@ export default function Deliveries() {
       },
     },
     {
-      title: 'Foyda', key: 'profit',
-      render: (_, r) => r.paidAmount > 0 ? (
-        <Text strong style={{ color: r.profit >= 0 ? '#52c41a' : '#ff4d4f' }}>
-          {r.profit >= 0 ? '+' : ''}{formatMoney(r.profit, 'USD')}
-        </Text>
-      ) : '—',
+      title: 'Supplier qarz', key: 'supplierDebt',
+      render: (_, r) => r.supplierDebt > 0 ? (
+        <Text type="danger">{formatMoney(r.supplierDebt, 'USD')}</Text>
+      ) : <Text type="success">—</Text>,
     },
     {
-      title: '', key: 'actions', width: 120,
+      title: '', key: 'actions', width: 140,
       render: (_, r) => (
         <Space>
+          <Button size="small" type="text" icon={<EyeOutlined />} onClick={() => setDetailDelivery(r)} />
           {r.debtStatus !== 'toliq' && (
-            <Button size="small" type="text" style={{ color: '#1677ff' }} icon={<DollarOutlined />} onClick={() => openPay(r)} />
+            <Button size="small" type="text" style={{ color: '#1677ff' }} icon={<DollarOutlined />} onClick={(e) => { e.stopPropagation(); openPay(r, 'customer'); }} />
           )}
           {r.status === "yo'lda" && (
             <Popconfirm title={t('deliveryConfirm')} onConfirm={() => deliverMut.mutate(r._id)}>
               <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
             </Popconfirm>
           )}
-          <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(r)} />
+          <Button size="small" type="text" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); openEdit(r); }} />
           <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMut.mutate(r._id)}>
             <Button size="small" type="text" danger icon={<DeleteOutlined />} />
           </Popconfirm>
@@ -267,7 +301,7 @@ export default function Deliveries() {
             <Text strong style={{ fontFamily: 'monospace' }}>{d.wagonCode || '—'}</Text>
             <Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag>
           </div>
-          {d.sender && <div style={{ color: '#888', fontSize: 12 }}>Kimdan: {d.sender}</div>}
+          {d.sender?.name && <div style={{ color: '#888', fontSize: 12 }}>Kimdan: {d.sender.name}</div>}
           <div style={{ color: '#555', fontSize: 13, marginBottom: 2 }}>Kimga: {d.customer?.name || '—'}</div>
           {d.cargoType && <div style={{ color: '#888', fontSize: 12 }}>{d.cargoType}{d.cargoWeight ? ` — ${d.cargoWeight} t` : ''}</div>}
           <div style={{ color: '#999', fontSize: 11, marginTop: 2 }}>
@@ -279,8 +313,8 @@ export default function Deliveries() {
               {d.uzRate > 0 && <Descriptions.Item label={d.uzCode ? `UZ (${d.uzCode})` : 'UZ'}>${d.uzRate}/t</Descriptions.Item>}
               {d.kzRate > 0 && <Descriptions.Item label={d.kzCode ? `KZ (${d.kzCode})` : 'KZ'}>${d.kzRate}/t</Descriptions.Item>}
               {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
-              {d.kodExpense > 0 && <Descriptions.Item label={d.kodCode ? `Kod (${d.kodCode})` : 'Kod'}>{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
               {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
+              {d.totalExpenses > 0 && <Descriptions.Item label="Xarajatlar">{formatMoney(d.totalExpenses, 'USD')}</Descriptions.Item>}
             </Descriptions>
             <div style={{ marginTop: 6 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 2 }}>
@@ -289,29 +323,147 @@ export default function Deliveries() {
               </div>
               <Progress percent={pct} showInfo={false} strokeColor={DEBT_COLOR[d.debtStatus]} size="small" />
             </div>
-            {d.profit !== 0 && d.paidAmount > 0 && (
-              <div style={{ fontSize: 12, marginTop: 4, color: d.profit >= 0 ? '#52c41a' : '#ff4d4f' }}>
-                Foyda: {d.profit >= 0 ? '+' : ''}{formatMoney(d.profit, 'USD')}
+            {d.supplierDebt > 0 && (
+              <div style={{ fontSize: 12, marginTop: 4, color: '#ff4d4f' }}>
+                Supplier qarz: {formatMoney(d.supplierDebt, 'USD')}
               </div>
             )}
           </div>
 
           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', marginTop: 4 }}>
             {d.debtStatus !== 'toliq' && (
-              <Button size="small" type="primary" icon={<DollarOutlined />} onClick={() => openPay(d)}>{t('payBtn')}</Button>
+              <Button size="small" type="primary" icon={<DollarOutlined />} onClick={(e) => { e.stopPropagation(); openPay(d, 'customer'); }}>{t('payBtn')}</Button>
             )}
             {d.status === "yo'lda" && (
               <Popconfirm title="Yetkazildi?" onConfirm={() => deliverMut.mutate(d._id)}>
                 <Button size="small" type="text" style={{ color: '#52c41a' }} icon={<CheckCircleOutlined />} />
               </Popconfirm>
             )}
-            <Button size="small" type="text" icon={<EditOutlined />} onClick={() => openEdit(d)} />
+            <Button size="small" type="text" icon={<EditOutlined />} onClick={(e) => { e.stopPropagation(); openEdit(d); }} />
             <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMut.mutate(d._id)}>
               <Button size="small" type="text" danger icon={<DeleteOutlined />} />
             </Popconfirm>
           </div>
         </Card>
       </Col>
+    );
+  };
+
+  const renderDetailTabs = (d) => {
+    const pct = d.totalDebt > 0 ? Math.min(100, Math.round((d.paidAmount / d.totalDebt) * 100)) : 0;
+    return (
+      <Tabs defaultActiveKey="info" items={[
+        {
+          key: 'info',
+          label: "Ma'lumot",
+          children: (
+            <>
+              <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label={t('status')}><Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag></Descriptions.Item>
+                {d.sender?.name && <Descriptions.Item label="Kimdan">{d.sender.name}</Descriptions.Item>}
+                <Descriptions.Item label="Kimga">{d.customer?.name || '—'}</Descriptions.Item>
+                <Descriptions.Item label={t('sentDateLabel')}>{formatDate(d.sentDate)}</Descriptions.Item>
+                <Descriptions.Item label={t('arrivedDateLabel')}>{d.arrivedDate ? formatDate(d.arrivedDate) : '—'}</Descriptions.Item>
+                {d.cargoType && <Descriptions.Item label={t('cargo')}>{d.cargoType}</Descriptions.Item>}
+                {d.cargoWeight > 0 && <Descriptions.Item label={t('weight')}>{d.cargoWeight} t</Descriptions.Item>}
+              </Descriptions>
+              <Descriptions bordered size="small" column={3} style={{ marginBottom: 16 }}>
+                {d.uzRate > 0 && <Descriptions.Item label={`UZ${d.uzCode ? ` (${d.uzCode})` : ''}`}>${d.uzRate}/t</Descriptions.Item>}
+                {d.kzRate > 0 && <Descriptions.Item label={`KZ${d.kzCode ? ` (${d.kzCode})` : ''}`}>${d.kzRate}/t</Descriptions.Item>}
+                {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+                {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
+                {d.totalExpenses > 0 && <Descriptions.Item label="Qo'shimcha xarajatlar">{formatMoney(d.totalExpenses, 'USD')}</Descriptions.Item>}
+              </Descriptions>
+              <Row gutter={16} style={{ marginBottom: 12 }}>
+                <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(d.totalDebt, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">Mijoz to'ladi</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(d.paidAmount, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">Mijoz qoldiq</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.remainingDebt, 'USD')}</Text></Col>
+              </Row>
+              <Progress percent={pct} strokeColor={DEBT_COLOR[d.debtStatus]} />
+              {d.sender && (
+                <Row gutter={16} style={{ marginTop: 12 }}>
+                  <Col span={8}><Text type="secondary">Supplier to'landi</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(d.supplierPaid, 'USD')}</Text></Col>
+                  <Col span={8}><Text type="secondary">Supplier qarz</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.supplierDebt, 'USD')}</Text></Col>
+                </Row>
+              )}
+            </>
+          ),
+        },
+        {
+          key: 'customerPayments',
+          label: `Mijoz to'lovlari (${d.payments?.length || 0})`,
+          children: (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <Button type="primary" size="small" icon={<DollarOutlined />}
+                  disabled={d.remainingDebt <= 0}
+                  onClick={() => openPay(d, 'customer')}>
+                  Mijozdan to'lov olish
+                </Button>
+              </div>
+              {d.payments?.length > 0 ? (
+                <Table
+                  size="small" pagination={false} dataSource={[...d.payments].reverse()} rowKey="_id"
+                  columns={[
+                    { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                    { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#389e0d' }}>{formatMoney(v, 'USD')}</Text> },
+                    { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+                    { title: '', key: 'del', width: 40, render: (_, p) => (
+                      <Popconfirm title={t('deleteConfirm')} onConfirm={() => deletePayMut.mutate({ id: d._id, paymentId: p._id })}>
+                        <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    )},
+                  ]}
+                />
+              ) : <Text type="secondary">To'lovlar yo'q</Text>}
+            </>
+          ),
+        },
+        {
+          key: 'supplierPayments',
+          label: `Supplier to'lovlari (${d.supplierPayments?.length || 0})`,
+          children: (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <Button type="primary" size="small" icon={<DollarOutlined />}
+                  disabled={d.supplierDebt <= 0}
+                  onClick={() => openPay(d, 'supplier')}>
+                  Supplierga to'lov qilish
+                </Button>
+              </div>
+              {d.supplierPayments?.length > 0 ? (
+                <Table
+                  size="small" pagination={false} dataSource={[...d.supplierPayments].reverse()} rowKey="_id"
+                  columns={[
+                    { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                    { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#cf1322' }}>{formatMoney(v, 'USD')}</Text> },
+                    { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+                    { title: '', key: 'del', width: 40, render: (_, p) => (
+                      <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteSupplierPayMut.mutate({ id: d._id, paymentId: p._id })}>
+                        <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    )},
+                  ]}
+                />
+              ) : <Text type="secondary">To'lovlar yo'q</Text>}
+            </>
+          ),
+        },
+        {
+          key: 'expenses',
+          label: `Xarajatlar (${d.expenses?.length || 0})`,
+          children: d.expenses?.length > 0 ? (
+            <Table
+              size="small" pagination={false} dataSource={d.expenses} rowKey="_id"
+              columns={[
+                { title: 'Tavsif', dataIndex: 'description', key: 'description' },
+                { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
+                { title: 'Valyuta', dataIndex: 'currency', key: 'currency' },
+              ]}
+            />
+          ) : <Text type="secondary">Qo'shimcha xarajatlar yo'q</Text>,
+        },
+      ]} />
     );
   };
 
@@ -331,10 +483,12 @@ export default function Deliveries() {
             ]}
           />
         </Space>
-        <Button icon={<CreditCardOutlined />} onClick={() => { setBulkPayOpen(true); setBulkCustomerId(null); setBulkAmounts({}); }}>
-          Ommaviy to'lov
-        </Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('newDelivery')}</Button>
+        <Space>
+          <Button icon={<CreditCardOutlined />} onClick={() => { setBulkPayOpen(true); setBulkCustomerId(null); setBulkAmounts({}); }}>
+            Ommaviy to'lov
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('newDelivery')}</Button>
+        </Space>
       </div>
 
       <Card className="summary-card" style={{ marginBottom: 16 }}>
@@ -356,6 +510,10 @@ export default function Deliveries() {
             <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalRemaining, 'USD')}</span>
           </div>
           <div className="summary-stat">
+            <span className="summary-stat-label">Supplier qarz</span>
+            <span className="summary-stat-value" style={{ color: '#fa8c16' }}>{formatMoney(totalSupplierDebt, 'USD')}</span>
+          </div>
+          <div className="summary-stat">
             <span className="summary-stat-label">{t('finished')}</span>
             <span className="summary-stat-value highlight">{deliveries.filter(d => d.status === 'yakunlandi').length}</span>
           </div>
@@ -375,51 +533,9 @@ export default function Deliveries() {
         open={!!detailDelivery}
         onCancel={() => setDetailDelivery(null)}
         footer={null}
-        width={600}
+        width={700}
       >
-        {detailDelivery && (() => {
-          const d = detailDelivery;
-          const pct = d.totalDebt > 0 ? Math.min(100, Math.round((d.paidAmount / d.totalDebt) * 100)) : 0;
-          return (
-            <>
-              <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
-                <Descriptions.Item label={t('status')}><Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag></Descriptions.Item>
-                {d.sender && <Descriptions.Item label="Kimdan">{d.sender}</Descriptions.Item>}
-                <Descriptions.Item label="Kimga">{d.customer?.name || '—'}</Descriptions.Item>
-                <Descriptions.Item label={t('sentDateLabel')}>{formatDate(d.sentDate)}</Descriptions.Item>
-                <Descriptions.Item label={t('arrivedDateLabel')}>{d.arrivedDate ? formatDate(d.arrivedDate) : '—'}</Descriptions.Item>
-                {d.cargoType && <Descriptions.Item label={t('cargo')}>{d.cargoType}</Descriptions.Item>}
-                {d.cargoWeight > 0 && <Descriptions.Item label={t('weight')}>{d.cargoWeight} t</Descriptions.Item>}
-              </Descriptions>
-              <Descriptions bordered size="small" column={3} style={{ marginBottom: 16 }}>
-                {d.uzRate > 0 && <Descriptions.Item label={`UZ${d.uzCode ? ` (${d.uzCode})` : ''}`}>${d.uzRate}/t</Descriptions.Item>}
-                {d.kzRate > 0 && <Descriptions.Item label={`KZ${d.kzCode ? ` (${d.kzCode})` : ''}`}>${d.kzRate}/t</Descriptions.Item>}
-                {d.avgExpense > 0 && <Descriptions.Item label={d.avgCode ? `AVG (${d.avgCode})` : 'AVG'}>{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
-                {d.kodExpense > 0 && <Descriptions.Item label={d.kodCode ? `Kod (${d.kodCode})` : 'Kod'}>{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
-                {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
-              </Descriptions>
-              <Row gutter={16} style={{ marginBottom: 12 }}>
-                <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(d.totalDebt, 'USD')}</Text></Col>
-                <Col span={8}><Text type="secondary">{t('paid')}</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(d.paidAmount, 'USD')}</Text></Col>
-                <Col span={8}><Text type="secondary">{t('remaining')}</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.remainingDebt, 'USD')}</Text></Col>
-              </Row>
-              <Progress percent={pct} strokeColor={DEBT_COLOR[d.debtStatus]} />
-              {d.payments?.length > 0 && (
-                <div style={{ marginTop: 16 }}>
-                  <Text strong style={{ marginBottom: 8, display: 'block' }}>{t('paid')} ({d.payments.length})</Text>
-                  <Table
-                    size="small" pagination={false} dataSource={d.payments} rowKey="_id"
-                    columns={[
-                      { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
-                      { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#389e0d' }}>{formatMoney(v, 'USD')}</Text> },
-                      { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
-                    ]}
-                  />
-                </div>
-              )}
-            </>
-          );
-        })()}
+        {detailDelivery && renderDetailTabs(detailDelivery)}
       </Modal>
 
       {/* Create/Edit Modal */}
@@ -431,7 +547,7 @@ export default function Deliveries() {
         confirmLoading={createMut.isPending || updateMut.isPending}
         okText={t('save')}
         cancelText={t('cancel')}
-        width={580}
+        width={620}
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={12}>
@@ -441,8 +557,32 @@ export default function Deliveries() {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item name="sender" label="Kimdan (jo'natuvchi)">
-                <Input placeholder="Kimdan olayotgani" />
+              <Form.Item name="sender" label="Kimdan (supplier)">
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Supplier tanlang"
+                  filterOption={(input, opt) => opt.label?.toLowerCase().includes(input.toLowerCase())}
+                  options={suppliers.map(s => ({ value: s._id, label: s.name }))}
+                  dropdownRender={(menu) => (
+                    <>
+                      {menu}
+                      <Divider style={{ margin: '8px 0' }} />
+                      <Space style={{ padding: '0 8px 4px' }}>
+                        <Input
+                          placeholder="Yangi supplier"
+                          value={newSupplierName}
+                          onChange={(e) => setNewSupplierName(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                          size="small"
+                        />
+                        <Button type="text" icon={<PlusOutlined />} onClick={handleAddNewSupplier} size="small">
+                          Qo'shish
+                        </Button>
+                      </Space>
+                    </>
+                  )}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -472,23 +612,14 @@ export default function Deliveries() {
           </Row>
 
           <Row gutter={12}>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="sentDate" label={t('sentDateLabel')}>
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={12}>
               <Form.Item name="arrivedDate" label={t('arrivedDateLabel')}>
                 <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
-              </Form.Item>
-            </Col>
-            <Col span={8}>
-              <Form.Item name="status" label={t('status')}>
-                <Select options={[
-                  { label: t('onRoad'), value: "yo'lda" },
-                  { label: t('delivered'), value: 'yetkazildi' },
-                  { label: t('finished'), value: 'yakunlandi' },
-                ]} />
               </Form.Item>
             </Col>
           </Row>
@@ -548,23 +679,45 @@ export default function Deliveries() {
           </Row>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="kodCode" label="Kod raqami" style={{ marginBottom: 8 }}>
-                <Input placeholder="Kod raqami" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item name="kodExpense" label="Kod summa (USD)" style={{ marginBottom: 8 }}>
-                <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Row gutter={12}>
-            <Col span={12}>
               <Form.Item name="prastoy" label="Prastoy (USD)">
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" addonBefore="$" />
               </Form.Item>
             </Col>
           </Row>
+
+          {/* Extra expenses */}
+          <Title level={5} style={{ margin: '8px 0 8px' }}>Qo'shimcha xarajatlar</Title>
+          <Form.List name="expenses">
+            {(fields, { add, remove }) => (
+              <>
+                {fields.map(({ key, name, ...rest }) => (
+                  <Row gutter={8} key={key} align="middle">
+                    <Col span={10}>
+                      <Form.Item {...rest} name={[name, 'description']} rules={[{ required: true, message: 'Tavsif' }]} style={{ marginBottom: 8 }}>
+                        <Input placeholder="Tavsif" size="small" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={7}>
+                      <Form.Item {...rest} name={[name, 'amount']} rules={[{ required: true, message: 'Summa' }]} style={{ marginBottom: 8 }}>
+                        <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={5}>
+                      <Form.Item {...rest} name={[name, 'currency']} initialValue="USD" style={{ marginBottom: 8 }}>
+                        <Select size="small" options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+                      </Form.Item>
+                    </Col>
+                    <Col span={2}>
+                      <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} size="small" style={{ marginBottom: 8 }} />
+                    </Col>
+                  </Row>
+                ))}
+                <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} size="small" style={{ marginBottom: 8 }}>
+                  Xarajat qo'shish
+                </Button>
+              </>
+            )}
+          </Form.List>
 
           {/* Live total */}
           <Form.Item noStyle shouldUpdate>
@@ -575,9 +728,9 @@ export default function Deliveries() {
               const uz = (form.getFieldValue('uzRate') || 0) * eff;
               const kz = (form.getFieldValue('kzRate') || 0) * eff;
               const avg = form.getFieldValue('avgExpense') || 0;
-              const kod = form.getFieldValue('kodExpense') || 0;
               const pr = form.getFieldValue('prastoy') || 0;
-              const total = uz + kz + avg + kod + pr;
+              const exps = (form.getFieldValue('expenses') || []).reduce((s, e) => s + (e?.amount || 0), 0);
+              const total = uz + kz + avg + pr + exps;
               if (!total) return null;
               return (
                 <Card size="small" style={{ background: '#fff7e6' }}>
@@ -590,8 +743,8 @@ export default function Deliveries() {
                     {uz > 0 && <Col span={12}><Text type="secondary">UZ: </Text><Text strong>{formatMoney(uz, 'USD')}</Text></Col>}
                     {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
                     {avg > 0 && <Col span={12}><Text type="secondary">AVG{form.getFieldValue('avgCode') ? ` (${form.getFieldValue('avgCode')})` : ''}: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
-                    {kod > 0 && <Col span={12}><Text type="secondary">Kod{form.getFieldValue('kodCode') ? ` (${form.getFieldValue('kodCode')})` : ''}: </Text><Text strong>{formatMoney(kod, 'USD')}</Text></Col>}
                     {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
+                    {exps > 0 && <Col span={12}><Text type="secondary">Xarajatlar: </Text><Text strong>{formatMoney(exps, 'USD')}</Text></Col>}
                   </Row>
                   <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
                     {t('customerDebt2')} <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
@@ -603,50 +756,45 @@ export default function Deliveries() {
         </Form>
       </Modal>
 
-      {/* Payment Modal */}
+      {/* Payment Modal (Customer or Supplier) */}
       <Modal
-        title={`To'lov — ${payTarget?.wagonCode || ''} (${payTarget?.customer?.name || ''})`}
+        title={payType === 'customer'
+          ? `Mijoz to'lovi — ${payTarget?.wagonCode || ''} (${payTarget?.customer?.name || ''})`
+          : `Supplier to'lov — ${payTarget?.wagonCode || ''} (${payTarget?.sender?.name || ''})`
+        }
         open={payModalOpen}
         onCancel={() => { setPayModalOpen(false); payForm.resetFields(); setPayTarget(null); }}
         onOk={() => payForm.submit()}
-        confirmLoading={payMut.isPending}
+        confirmLoading={payMut.isPending || supplierPayMut.isPending}
         okText={t('payBtn')}
         cancelText={t('cancel')}
       >
         {payTarget && (
-          <>
-            <div style={{ marginBottom: 12, padding: '10px 14px', background: '#f6ffed', borderRadius: 8 }}>
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: payType === 'customer' ? '#f6ffed' : '#fff7e6', borderRadius: 8 }}>
+            {payType === 'customer' ? (
               <Row gutter={16}>
                 <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
                 <Col span={8}><Text type="secondary">{t('paid')}:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.paidAmount, 'USD')}</Text></Col>
                 <Col span={8}><Text type="secondary">{t('remaining')}:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.remainingDebt, 'USD')}</Text></Col>
               </Row>
-            </div>
-            {payTarget.payments?.length > 0 && (
-              <Table
-                size="small"
-                style={{ marginBottom: 16 }}
-                pagination={false}
-                dataSource={[...payTarget.payments].reverse()}
-                rowKey="_id"
-                columns={[
-                  { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
-                  { title: 'USD', dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#389e0d' }}>{formatMoney(v, 'USD')}</Text> },
-                  { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
-                  { title: '', key: 'del', width: 40, render: (_, p) => (
-                    <Popconfirm title={t('deleteConfirm')} onConfirm={() => deletePayMut.mutate({ id: payTarget._id, paymentId: p._id })}>
-                      <Button size="small" type="text" danger icon={<DeleteOutlined />} loading={deletePayMut.isPending} />
-                    </Popconfirm>
-                  )},
-                ]}
-              />
+            ) : (
+              <Row gutter={16}>
+                <Col span={8}><Text type="secondary">Jami qarz</Text><br /><Text strong>{formatMoney(payTarget.totalDebt, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">To'landi:</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(payTarget.supplierPaid, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">Qoldiq:</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(payTarget.supplierDebt, 'USD')}</Text></Col>
+              </Row>
             )}
-          </>
+          </div>
         )}
         <Form form={payForm} layout="vertical" onFinish={(values) => {
-          payMut.mutate({ id: payTarget._id, data: { ...values, date: values.date?.toISOString() } });
+          const data = { ...values, date: values.date?.toISOString() };
+          if (payType === 'customer') {
+            payMut.mutate({ id: payTarget._id, data });
+          } else {
+            supplierPayMut.mutate({ id: payTarget._id, data });
+          }
         }}>
-          <Form.Item name="amount" label="To'lov summasi (USD)" rules={[{ required: true, message: t('enterAmount') }]}>
+          <Form.Item name="amount" label={`To'lov summasi (USD)`} rules={[{ required: true, message: t('enterAmount') }]}>
             <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" addonBefore="$" />
           </Form.Item>
           <Form.Item name="date" label={t('date')}>
@@ -657,6 +805,7 @@ export default function Deliveries() {
           </Form.Item>
         </Form>
       </Modal>
+
       {/* Bulk Payment Modal */}
       <Modal
         title="Ommaviy to'lov"

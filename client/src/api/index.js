@@ -149,6 +149,10 @@ export const addDeliveryPayment = (id, data) =>
   api.post(`/deliveries/${id}/payment`, data).then((r) => r.data);
 export const deleteDeliveryPayment = (id, paymentId) =>
   api.delete(`/deliveries/${id}/payments/${paymentId}`).then((r) => r.data);
+export const addDeliverySupplierPayment = (id, data) =>
+  api.post(`/deliveries/${id}/supplier-payment`, data).then((r) => r.data);
+export const deleteDeliverySupplierPayment = (id, paymentId) =>
+  api.delete(`/deliveries/${id}/supplier-payments/${paymentId}`).then((r) => r.data);
 
 // Suppliers
 export const getSuppliers = () => api.get("/suppliers").then((r) => r.data);
