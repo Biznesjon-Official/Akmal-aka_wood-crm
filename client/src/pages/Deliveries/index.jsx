@@ -5,13 +5,14 @@ import {
   message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress, Tabs, Divider,
 } from 'antd';
 import {
-  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined, CreditCardOutlined, EyeOutlined, MinusCircleOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined, CreditCardOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getDeliveries, createDelivery, updateDelivery, deleteDelivery,
   markDelivered, addDeliveryPayment, deleteDeliveryPayment,
   addDeliverySupplierPayment, deleteDeliverySupplierPayment,
+  addDeliveryExpense, deleteDeliveryExpense,
   getCustomers, createCustomer, getSuppliers, createSupplier,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
@@ -44,6 +45,9 @@ export default function Deliveries() {
   const [bulkAmounts, setBulkAmounts] = useState({});
   const [bulkPayLoading, setBulkPayLoading] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState('');
+  const [expenseModalOpen, setExpenseModalOpen] = useState(false);
+  const [expenseTarget, setExpenseTarget] = useState(null);
+  const [expenseForm] = Form.useForm();
 
   const STATUS_LABEL = {
     "yo'lda": t('onRoad'),
@@ -123,6 +127,18 @@ export default function Deliveries() {
     onError: () => message.error(t('error')),
   });
 
+  const addExpenseMut = useMutation({
+    mutationFn: ({ id, data }) => addDeliveryExpense(id, data),
+    onSuccess: (updated) => { invalidate(); message.success("Xarajat qo'shildi"); setDetailDelivery(updated); setExpenseModalOpen(false); expenseForm.resetFields(); },
+    onError: () => message.error(t('error')),
+  });
+
+  const deleteExpenseMut = useMutation({
+    mutationFn: ({ id, expenseId }) => deleteDeliveryExpense(id, expenseId),
+    onSuccess: (updated) => { invalidate(); message.success(t('deleted')); setDetailDelivery(updated); },
+    onError: () => message.error(t('error')),
+  });
+
   const closeModal = () => {
     setModalOpen(false); setEditing(null);
     form.resetFields(); setCustomerTyped(''); setIsNewCustomer(false); setNewSupplierName('');
@@ -130,7 +146,7 @@ export default function Deliveries() {
 
   const openCreate = () => {
     form.resetFields();
-    form.setFieldsValue({ sentDate: dayjs(), expenses: [] });
+    form.setFieldsValue({ sentDate: dayjs() });
     setEditing(null); setCustomerTyped(''); setIsNewCustomer(false); setNewSupplierName('');
     setModalOpen(true);
   };
@@ -148,7 +164,6 @@ export default function Deliveries() {
       customerName: custName,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
       arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
-      expenses: record.expenses || [],
     });
     setModalOpen(true);
   };
@@ -183,7 +198,6 @@ export default function Deliveries() {
         sender: values.sender || null,
         sentDate: values.sentDate?.toISOString(),
         arrivedDate: values.arrivedDate?.toISOString() || null,
-        expenses: values.expenses || [],
       };
       delete data.customerName;
       delete data.customerPhone;
@@ -452,16 +466,37 @@ export default function Deliveries() {
         {
           key: 'expenses',
           label: `Xarajatlar (${d.expenses?.length || 0})`,
-          children: d.expenses?.length > 0 ? (
-            <Table
-              size="small" pagination={false} dataSource={d.expenses} rowKey="_id"
-              columns={[
-                { title: 'Tavsif', dataIndex: 'description', key: 'description' },
-                { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
-                { title: 'Valyuta', dataIndex: 'currency', key: 'currency' },
-              ]}
-            />
-          ) : <Text type="secondary">Qo'shimcha xarajatlar yo'q</Text>,
+          children: (
+            <>
+              <div style={{ marginBottom: 12 }}>
+                <Button type="primary" size="small" icon={<PlusOutlined />}
+                  onClick={() => { setExpenseTarget(d); expenseForm.resetFields(); expenseForm.setFieldsValue({ currency: 'USD' }); setExpenseModalOpen(true); }}>
+                  Chiqim qo'shish
+                </Button>
+              </div>
+              {d.expenses?.length > 0 ? (
+                <Table
+                  size="small" pagination={false} dataSource={d.expenses} rowKey="_id"
+                  columns={[
+                    { title: 'Tavsif', dataIndex: 'description', key: 'description' },
+                    { title: 'Summa', dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
+                    { title: 'Valyuta', dataIndex: 'currency', key: 'currency' },
+                    { title: '', key: 'del', width: 40, render: (_, e) => (
+                      <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteExpenseMut.mutate({ id: d._id, expenseId: e._id })}>
+                        <Button size="small" type="text" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    )},
+                  ]}
+                />
+              ) : <Text type="secondary">Xarajatlar yo'q</Text>}
+              {d.totalExpenses > 0 && (
+                <div style={{ marginTop: 8, padding: '6px 12px', background: '#fff7e6', borderRadius: 6 }}>
+                  <Text type="secondary">Jami xarajat: </Text>
+                  <Text strong style={{ color: '#d46b08' }}>{formatMoney(d.totalExpenses, 'USD')}</Text>
+                </div>
+              )}
+            </>
+          ),
         },
       ]} />
     );
@@ -685,40 +720,6 @@ export default function Deliveries() {
             </Col>
           </Row>
 
-          {/* Extra expenses */}
-          <Title level={5} style={{ margin: '8px 0 8px' }}>Qo'shimcha xarajatlar</Title>
-          <Form.List name="expenses">
-            {(fields, { add, remove }) => (
-              <>
-                {fields.map(({ key, name, ...rest }) => (
-                  <Row gutter={8} key={key} align="middle">
-                    <Col span={10}>
-                      <Form.Item {...rest} name={[name, 'description']} rules={[{ required: true, message: 'Tavsif' }]} style={{ marginBottom: 8 }}>
-                        <Input placeholder="Tavsif" size="small" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={7}>
-                      <Form.Item {...rest} name={[name, 'amount']} rules={[{ required: true, message: 'Summa' }]} style={{ marginBottom: 8 }}>
-                        <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={5}>
-                      <Form.Item {...rest} name={[name, 'currency']} initialValue="USD" style={{ marginBottom: 8 }}>
-                        <Select size="small" options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
-                      </Form.Item>
-                    </Col>
-                    <Col span={2}>
-                      <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => remove(name)} size="small" style={{ marginBottom: 8 }} />
-                    </Col>
-                  </Row>
-                ))}
-                <Button type="dashed" onClick={() => add()} icon={<PlusOutlined />} size="small" style={{ marginBottom: 8 }}>
-                  Xarajat qo'shish
-                </Button>
-              </>
-            )}
-          </Form.List>
-
           {/* Live total */}
           <Form.Item noStyle shouldUpdate>
             {() => {
@@ -729,8 +730,7 @@ export default function Deliveries() {
               const kz = (form.getFieldValue('kzRate') || 0) * eff;
               const avg = form.getFieldValue('avgExpense') || 0;
               const pr = form.getFieldValue('prastoy') || 0;
-              const exps = (form.getFieldValue('expenses') || []).reduce((s, e) => s + (e?.amount || 0), 0);
-              const total = uz + kz + avg + pr + exps;
+              const total = uz + kz + avg + pr;
               if (!total) return null;
               return (
                 <Card size="small" style={{ background: '#fff7e6' }}>
@@ -744,7 +744,6 @@ export default function Deliveries() {
                     {kz > 0 && <Col span={12}><Text type="secondary">KZ: </Text><Text strong>{formatMoney(kz, 'USD')}</Text></Col>}
                     {avg > 0 && <Col span={12}><Text type="secondary">AVG{form.getFieldValue('avgCode') ? ` (${form.getFieldValue('avgCode')})` : ''}: </Text><Text strong>{formatMoney(avg, 'USD')}</Text></Col>}
                     {pr > 0 && <Col span={12}><Text type="secondary">Prastoy: </Text><Text strong>{formatMoney(pr, 'USD')}</Text></Col>}
-                    {exps > 0 && <Col span={12}><Text type="secondary">Xarajatlar: </Text><Text strong>{formatMoney(exps, 'USD')}</Text></Col>}
                   </Row>
                   <div style={{ marginTop: 8, borderTop: '1px solid #ffd591', paddingTop: 6 }}>
                     {t('customerDebt2')} <Text strong style={{ fontSize: 16, color: '#d46b08' }}>{formatMoney(total, 'USD')}</Text>
@@ -803,6 +802,37 @@ export default function Deliveries() {
           <Form.Item name="note" label={t('note')}>
             <Input placeholder={t('note')} />
           </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Expense Modal */}
+      <Modal
+        title={`Chiqim qo'shish — ${expenseTarget?.wagonCode || ''}`}
+        open={expenseModalOpen}
+        onCancel={() => { setExpenseModalOpen(false); expenseForm.resetFields(); }}
+        onOk={() => expenseForm.submit()}
+        confirmLoading={addExpenseMut.isPending}
+        okText="Qo'shish"
+        cancelText={t('cancel')}
+      >
+        <Form form={expenseForm} layout="vertical" onFinish={(values) => {
+          addExpenseMut.mutate({ id: expenseTarget._id, data: values });
+        }}>
+          <Form.Item name="description" label="Tavsif" rules={[{ required: true, message: 'Tavsif kiriting' }]}>
+            <Input placeholder="Masalan: Yukni tushirish, Kran xizmati..." />
+          </Form.Item>
+          <Row gutter={12}>
+            <Col span={14}>
+              <Form.Item name="amount" label="Summa" rules={[{ required: true, message: 'Summa kiriting' }]}>
+                <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
+              </Form.Item>
+            </Col>
+            <Col span={10}>
+              <Form.Item name="currency" label="Valyuta">
+                <Select options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
 

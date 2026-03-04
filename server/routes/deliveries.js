@@ -9,6 +9,8 @@ router.delete('/:id', ctrl.remove);
 router.put('/:id/deliver', ctrl.markDelivered);
 router.post('/:id/payment', ctrl.addPayment);
 router.delete('/:id/payments/:paymentId', ctrl.removePayment);
+router.post('/:id/expense', ctrl.addExpense);
+router.delete('/:id/expenses/:expenseId', ctrl.removeExpense);
 router.post('/:id/supplier-payment', ctrl.addSupplierPayment);
 router.delete('/:id/supplier-payments/:paymentId', ctrl.removeSupplierPayment);
 

@@ -141,6 +141,50 @@ exports.addSupplierPayment = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+// Add expense (cash chiqim)
+exports.addExpense = async (req, res, next) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id).populate(populateFields);
+    if (!delivery) return res.status(404).json({ message: 'Yetkazma topilmadi' });
+
+    const { description, amount, currency = 'USD' } = req.body;
+    if (!description || !amount || amount <= 0) return res.status(400).json({ message: 'Tavsif va summa kerak' });
+
+    delivery.expenses.push({ description, amount, currency });
+    await delivery.save();
+
+    await CashTransaction.create({
+      type: 'chiqim',
+      category: 'yetkazma-xarajat',
+      amount,
+      currency,
+      account: currency === 'USD' ? 'USD_account' : 'RUB_account',
+      description: `Yetkazma xarajat: ${delivery.wagonCode || ''} — ${description}`,
+      relatedDelivery: delivery._id,
+      date: new Date(),
+    });
+
+    res.json(delivery.toJSON());
+  } catch (err) { next(err); }
+};
+
+// Remove expense
+exports.removeExpense = async (req, res, next) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id);
+    if (!delivery) return res.status(404).json({ message: 'Topilmadi' });
+    const idx = delivery.expenses.findIndex(e => e._id.toString() === req.params.expenseId);
+    if (idx < 0) return res.status(404).json({ message: 'Xarajat topilmadi' });
+    const [removed] = delivery.expenses.splice(idx, 1);
+    await delivery.save();
+    await CashTransaction.deleteMany({
+      relatedDelivery: delivery._id, category: 'yetkazma-xarajat', amount: removed.amount,
+    });
+    const populated = await delivery.populate(populateFields);
+    res.json(populated.toJSON());
+  } catch (err) { next(err); }
+};
+
 // Remove supplier payment
 exports.removeSupplierPayment = async (req, res, next) => {
   try {
