@@ -11,19 +11,26 @@ function mapCategory(description) {
 }
 
 // Sync wagon expenses → CashTransaction records
-async function syncWagonCashTransactions(wagonId, expenses, transportType) {
+async function syncWagonCashTransactions(wagonId, expenses, transportType, supplierId) {
   await CashTransaction.deleteMany({ relatedWagon: wagonId });
   if (!expenses || expenses.length === 0) return;
   const prefix = transportType === 'mashina' ? 'Mashina' : 'Vagon';
-  const docs = expenses.map((e) => ({
-    type: 'chiqim',
-    category: mapCategory(e.description),
-    amount: e.amount,
-    currency: e.currency || 'USD',
-    account: (e.currency || 'USD') === 'RUB' ? 'RUB_russia' : 'USD_account',
-    description: `${prefix}: ${e.description}`,
-    relatedWagon: wagonId,
-  }));
+  const docs = expenses.map((e) => {
+    const doc = {
+      type: 'chiqim',
+      category: mapCategory(e.description),
+      amount: e.amount,
+      currency: e.currency || 'USD',
+      account: (e.currency || 'USD') === 'RUB' ? 'RUB_russia' : 'USD_account',
+      description: `${prefix}: ${e.description}`,
+      relatedWagon: wagonId,
+    };
+    if (supplierId) {
+      doc.relatedPerson = supplierId;
+      doc.personModel = 'Supplier';
+    }
+    return doc;
+  });
   await CashTransaction.insertMany(docs);
 }
 
@@ -54,7 +61,7 @@ exports.getOne = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const wagon = await Wagon.create(req.body);
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
     res.status(201).json(wagon);
   } catch (err) { next(err); }
 };
@@ -65,7 +72,7 @@ exports.update = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     Object.assign(wagon, req.body);
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
     res.json(wagon);
   } catch (err) { next(err); }
 };
@@ -122,7 +129,7 @@ exports.updateExpenses = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     wagon.expenses = req.body.expenses;
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
     res.json(wagon);
   } catch (err) { next(err); }
 };

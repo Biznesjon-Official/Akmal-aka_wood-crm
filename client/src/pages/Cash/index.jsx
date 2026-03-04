@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Table, Button, Modal, Form, InputNumber, Select, DatePicker,
-  Input, message, Tag, Card, Row, Col, Space, Popconfirm, List, Switch, Segmented, Typography, Divider,
+  Input, message, Tag, Card, Row, Col, Space, Popconfirm, List, Switch, Segmented, Typography, Divider, Descriptions,
 } from 'antd';
-import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, TeamOutlined, DollarOutlined } from '@ant-design/icons';
+import { WalletOutlined, SettingOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined, TeamOutlined, DollarOutlined, EyeOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getCashTransactions, createCashTransaction, deleteCashTransaction, getCashBalance,
   getExpenseSources, createExpenseSource, updateExpenseSource, deleteExpenseSource,
-  getWagons, getWagonProfitSummary, addWagonExpense,
+  getWagons, getWagonProfitSummary, addWagonExpense, getCustomers, getSuppliers,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import '../styles/cards.css';
@@ -33,6 +33,7 @@ export default function Cash() {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [viewMode, setViewMode] = useState('table');
+  const [detailTx, setDetailTx] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState(null);
   const [sourcesModalOpen, setSourcesModalOpen] = useState(false);
@@ -87,6 +88,8 @@ export default function Cash() {
   });
 
   const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: getWagons });
+  const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
+  const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
 
   const partners = sources.filter(s => s.profitPercent > 0);
 
@@ -173,6 +176,10 @@ export default function Cash() {
       description: values.description,
       date: values.date?.toISOString(),
     };
+    if (values.relatedPerson) {
+      payload.relatedPerson = values.relatedPerson;
+      payload.personModel = values.personType;
+    }
 
     if (modalType === 'kirim') {
       payload.category = values.category;
@@ -291,6 +298,10 @@ export default function Cash() {
       render: (type) => <Tag color={type === 'kirim' ? 'green' : 'red'}>{type === 'kirim' ? t('income') : t('expense')}</Tag>,
     },
     { title: t('source'), key: 'source', render: (_, record) => getSourceName(record) },
+    {
+      title: 'Kimga/Kimdan', key: 'person', width: 130,
+      render: (_, record) => record.relatedPerson?.name || '—',
+    },
     {
       title: t('amount'), dataIndex: 'amount', key: 'amount',
       render: (amount, record) => (
@@ -416,7 +427,8 @@ export default function Cash() {
         <Row gutter={[12, 12]}>
           {transactions.map((tx) => (
             <Col xs={24} sm={12} lg={8} xl={6} key={tx._id}>
-              <Card className={`grid-card cash-card ${tx.type}`} size="small">
+              <Card className={`grid-card cash-card ${tx.type}`} size="small"
+                onClick={() => setDetailTx(tx)} style={{ cursor: 'pointer' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                   <Tag color={tx.type === 'kirim' ? 'green' : 'red'}>{tx.type === 'kirim' ? t('income') : t('expense')}</Tag>
                   <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(tx.date)}</Text>
@@ -432,6 +444,12 @@ export default function Cash() {
                   <Text type="secondary" style={{ fontSize: 12 }}>{t('account')}:</Text>
                   <Text style={{ fontSize: 12 }}>{accountOptions.find((a) => a.value === tx.account)?.label || tx.account}</Text>
                 </div>
+                {tx.relatedPerson?.name && (
+                  <div className="grid-card-row">
+                    <Text type="secondary" style={{ fontSize: 12 }}>Kimga/Kimdan:</Text>
+                    <Text style={{ fontSize: 12 }}>{tx.relatedPerson.name}</Text>
+                  </div>
+                )}
                 {tx.description && <Text type="secondary" style={{ fontSize: 11, marginTop: 4, display: 'block' }} ellipsis>{tx.description}</Text>}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                   <Popconfirm title={t('deleteConfirm')} onConfirm={() => deleteMutation.mutate(tx._id)}>
@@ -443,8 +461,36 @@ export default function Cash() {
           ))}
         </Row>
       ) : (
-        <Table columns={columns} dataSource={transactions} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }} />
+        <Table columns={columns} dataSource={transactions} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }}
+          onRow={(record) => ({ onClick: () => setDetailTx(record), style: { cursor: 'pointer' } })} />
       )}
+
+      {/* Transaction detail modal */}
+      <Modal
+        title={detailTx ? (detailTx.type === 'kirim' ? t('income') : t('expense')) : ''}
+        open={!!detailTx}
+        onCancel={() => setDetailTx(null)}
+        footer={null}
+        width={500}
+      >
+        {detailTx && (
+          <Descriptions bordered size="small" column={1}>
+            <Descriptions.Item label={t('date')}>{formatDate(detailTx.date)}</Descriptions.Item>
+            <Descriptions.Item label={t('type')}>
+              <Tag color={detailTx.type === 'kirim' ? 'green' : 'red'}>{detailTx.type === 'kirim' ? t('income') : t('expense')}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label={t('amount')}>
+              <Text style={{ color: detailTx.type === 'chiqim' ? '#cf1322' : '#389e0d', fontWeight: 600, fontSize: 16 }}>
+                {detailTx.type === 'chiqim' ? '−' : '+'}{formatMoney(detailTx.amount, detailTx.currency)}
+              </Text>
+            </Descriptions.Item>
+            <Descriptions.Item label={t('source')}>{getSourceName(detailTx)}</Descriptions.Item>
+            <Descriptions.Item label={t('account')}>{accountOptions.find(a => a.value === detailTx.account)?.label || detailTx.account}</Descriptions.Item>
+            {detailTx.relatedPerson?.name && <Descriptions.Item label="Kimga/Kimdan">{detailTx.relatedPerson.name}</Descriptions.Item>}
+            {detailTx.description && <Descriptions.Item label={t('note')}>{detailTx.description}</Descriptions.Item>}
+          </Descriptions>
+        )}
+      </Modal>
 
       {/* Create transaction modal */}
       <Modal
@@ -487,6 +533,30 @@ export default function Cash() {
           </Form.Item>
           <Form.Item name="account" label={t('account')} initialValue="USD_account">
             <Select options={accountOptions} />
+          </Form.Item>
+          <Form.Item name="personType" label="Kimga/Kimdan">
+            <Select allowClear placeholder="Tanlang (ixtiyoriy)" onChange={() => form.setFieldValue('relatedPerson', undefined)}>
+              <Select.Option value="Customer">Mijoz</Select.Option>
+              <Select.Option value="Supplier">Yetkazuvchi</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.personType !== cur.personType}>
+            {() => {
+              const pt = form.getFieldValue('personType');
+              if (!pt) return null;
+              const opts = pt === 'Customer'
+                ? customers.map(c => ({ value: c._id, label: c.name }))
+                : suppliers.map(s => ({ value: s._id, label: s.name }));
+              return (
+                <Form.Item name="relatedPerson" label={pt === 'Customer' ? 'Mijoz' : 'Yetkazuvchi'}>
+                  <Select
+                    showSearch placeholder="Tanlang"
+                    filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+                    options={opts}
+                  />
+                </Form.Item>
+              );
+            }}
           </Form.Item>
           <Form.Item name="description" label={t('note')}>
             <Input.TextArea rows={3} placeholder={t('note') + '...'} />

@@ -3,7 +3,9 @@ const CashTransaction = require('../models/CashTransaction');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const debts = await LentDebt.find().sort({ date: -1 }).lean({ virtuals: true });
+    const filter = {};
+    if (req.query.debtor) filter.debtor = req.query.debtor;
+    const debts = await LentDebt.find(filter).sort({ date: -1 }).lean({ virtuals: true });
     res.json(debts);
   } catch (err) { next(err); }
 };

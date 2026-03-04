@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Table, InputNumber, Card, Typography, Space, Spin, Tag, Row, Col, Segmented, Progress, Button, Popover, Tabs, message, Modal, Form } from 'antd';
-import { AppstoreOutlined, BarsOutlined, WarningOutlined, ShoppingCartOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, InputNumber, Card, Typography, Space, Spin, Tag, Row, Col, Segmented, Progress, Button, Popover, Tabs, message, Modal, Form, Descriptions } from 'antd';
+import { AppstoreOutlined, BarsOutlined, WarningOutlined, ShoppingCartOutlined, PlusOutlined, EyeOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getWagons, addAstatkaBundle } from '../../api';
 import { formatM3, formatMoney, calcM3PerPiece } from '../../utils/format';
@@ -59,6 +59,7 @@ export default function Warehouse() {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState({ thickness: null, width: null, length: null });
   const [viewMode, setViewMode] = useState('table');
+  const [detailBundle, setDetailBundle] = useState(null);
   const [astatkaOpen, setAstatkaOpen] = useState(false);
   const [astatkaForm] = Form.useForm();
 
@@ -236,6 +237,54 @@ export default function Warehouse() {
         </Form>
       </Modal>
 
+      {/* Bundle detail modal */}
+      <Modal
+        title={detailBundle ? `${detailBundle.wagonCode} — ${detailBundle.thickness}×${detailBundle.width}mm × ${detailBundle.length}m` : ''}
+        open={!!detailBundle}
+        onCancel={() => setDetailBundle(null)}
+        footer={null}
+        width={480}
+      >
+        {detailBundle && (() => {
+          const bundleM3 = (detailBundle.m3PerPiece || 0) * (detailBundle.remainingCount || 0);
+          return (
+            <div>
+              <Row gutter={16} style={{ marginBottom: 12 }}>
+                <Col span={8}><Text type="secondary">{t('thickness')}</Text><br /><Text strong>{detailBundle.thickness} mm</Text></Col>
+                <Col span={8}><Text type="secondary">{t('width')}</Text><br /><Text strong>{detailBundle.width} mm</Text></Col>
+                <Col span={8}><Text type="secondary">{t('length')}</Text><br /><Text strong>{detailBundle.length} m</Text></Col>
+              </Row>
+              <Row gutter={16} style={{ marginBottom: 12 }}>
+                <Col span={8}><Text type="secondary">{t('count')}</Text><br /><Text strong>{detailBundle.count} {t('pieces')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('remaining')}</Text><br /><Text strong type={detailBundle.remainingCount < detailBundle.count ? 'warning' : undefined}>{detailBundle.remainingCount} {t('pieces')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('unitM3')}</Text><br /><Text strong>{formatM3(detailBundle.m3PerPiece)}</Text></Col>
+              </Row>
+              <Row gutter={16} style={{ marginBottom: 12 }}>
+                <Col span={12}><Text type="secondary">{t('totalM3')}</Text><br /><Text strong>{formatM3(bundleM3)} m³</Text></Col>
+                <Col span={12}><Text type="secondary">{t('costPerM3')}</Text><br /><Text strong>{detailBundle.costPricePerM3 > 0 ? formatMoney(detailBundle.costPricePerM3) : '—'}</Text></Col>
+              </Row>
+              {(detailBundle.deductions || []).length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary" strong>Sotuvlar:</Text>
+                  {detailBundle.deductions.map((d, i) => (
+                    <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid #f0f0f0', fontSize: 13 }}>
+                      <WarningOutlined style={{ marginRight: 4 }} /> −{d.count} {t('pieces')}: {d.reason}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {detailBundle.remainingCount > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <SellPopover bundle={detailBundle}>
+                    <Button type="primary" icon={<ShoppingCartOutlined />} block>{t('sell')}</Button>
+                  </SellPopover>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
+
       <Tabs defaultActiveKey="active" items={[
         {
           key: 'active',
@@ -245,6 +294,7 @@ export default function Warehouse() {
               {viewMode === 'table' ? (
                 <Table columns={tableColumns} dataSource={flatBundles} rowKey="_key"
                   pagination={{ pageSize: 20 }} size="small"
+                  onRow={(record) => ({ onClick: () => setDetailBundle(record), style: { cursor: 'pointer' } })}
                   summary={() => (
                     <Table.Summary.Row>
                       <Table.Summary.Cell index={0} colSpan={7}><Text strong>{t('totalRemainingM3')}</Text></Table.Summary.Cell>
@@ -258,7 +308,7 @@ export default function Warehouse() {
                     const usedPercent = b.count > 0 ? Math.round((b.remainingCount / b.count) * 100) : 0;
                     return (
                       <Col key={b._key} xs={24} sm={12} md={8} lg={6}>
-                        <Card className="warehouse-card">
+                        <Card className="warehouse-card" onClick={() => setDetailBundle(b)} style={{ cursor: 'pointer' }}>
                           <div className="warehouse-card-top">
                             <Tag color="blue">{b.wagonCode}</Tag>
                             {b.costPricePerM3 > 0 && (

@@ -5,7 +5,7 @@ import CartDrawer from './CartDrawer';
 import {
   DashboardOutlined, CarOutlined, DatabaseOutlined, ShoppingCartOutlined,
   UserOutlined, FileTextOutlined, WalletOutlined, SwapOutlined, TruckOutlined,
-  TeamOutlined, LockOutlined, LogoutOutlined,
+  TeamOutlined, LockOutlined, LogoutOutlined, AccountBookOutlined,
 } from '@ant-design/icons';
 import { setupPin } from '../api';
 import { useLanguage } from '../context/LanguageContext';
@@ -23,6 +23,7 @@ export default function AppLayout() {
   const navItems = [
     { key: '/', icon: <DashboardOutlined />, label: t('dashboard') },
     { key: '/wagons', icon: <CarOutlined />, label: t('wagons') },
+    { key: '/expenses', icon: <AccountBookOutlined />, label: t('expenses') || 'Xarajatlar' },
     { key: '/warehouse', icon: <DatabaseOutlined />, label: t('warehouse') },
     { key: '/sales', icon: <ShoppingCartOutlined />, label: t('sales') },
     { key: '/customers', icon: <UserOutlined />, label: t('customers') },

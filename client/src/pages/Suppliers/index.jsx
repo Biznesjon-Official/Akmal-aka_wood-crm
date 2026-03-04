@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Table, Button, Modal, Form, Input, InputNumber, message, Popconfirm, Space, Card,
   Segmented, Row, Col, Typography, Drawer, Tag, Descriptions, Tabs, DatePicker, List } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, AppstoreOutlined, BarsOutlined,
-  PhoneOutlined, EyeOutlined, SwapOutlined, WalletOutlined } from '@ant-design/icons';
+  PhoneOutlined, EyeOutlined, SwapOutlined, WalletOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier, getSupplierWagons,
@@ -182,6 +182,7 @@ function RubAccounts() {
 const Suppliers = () => {
   const { t } = useLanguage();
   const [viewMode, setViewMode] = useState('table');
+  const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
@@ -316,9 +317,11 @@ const Suppliers = () => {
     },
   ];
 
+  const filteredSuppliers = (suppliers || []).filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
+
   const renderCards = () => (
     <Row gutter={[16, 16]}>
-      {(suppliers || []).map((s) => (
+      {filteredSuppliers.map((s) => (
         <Col xs={24} sm={12} lg={8} xl={6} key={s._id}>
           <Card className="grid-card customer-card">
             <div className="grid-card-title">{s.name}</div>
@@ -351,14 +354,22 @@ const Suppliers = () => {
       {/* RUB Accounts Section */}
       <RubAccounts />
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
           <h2 style={{ margin: 0 }}>{t('suppliersPage')}</h2>
           <Segmented value={viewMode} onChange={setViewMode}
             options={[
               { value: 'card', icon: <AppstoreOutlined /> },
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
+          <Input
+            placeholder={t('search') || 'Qidirish...'}
+            prefix={<SearchOutlined />}
+            allowClear
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 200 }}
+          />
         </Space>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           {t('addSupplier')}
@@ -379,7 +390,11 @@ const Suppliers = () => {
       </Card>
 
       {viewMode === 'card' ? renderCards() : (
-        <Table rowKey="_id" columns={columns} dataSource={suppliers} loading={isLoading} />
+        <Table rowKey="_id" columns={columns}
+          dataSource={(suppliers || []).filter(s => !search || s.name?.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search))}
+          loading={isLoading}
+          onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+        />
       )}
 
       {/* Create / Edit Modal */}

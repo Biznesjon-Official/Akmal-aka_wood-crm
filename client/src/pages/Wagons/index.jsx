@@ -21,7 +21,7 @@ const { Text } = Typography;
 
 const STATUS_OPTIONS = Object.entries(statusLabels).map(([value, label]) => ({ value, label }));
 
-// Fixed expense types that always show (USD)
+// Fixed expense types that always show (USD) — used only in detail view
 const FIXED_EXPENSES = [
   'NDS', 'Usluga', "Temir yo'l KZ", "Temir yo'l UZ",
   'Tupik', 'Xrannei', 'Klentga ortish', 'Yerga tushurish',
@@ -33,121 +33,10 @@ const cellS = { padding: '6px 10px' };
 const labelS = { ...cellS, fontWeight: 500, background: '#fafafa', whiteSpace: 'nowrap' };
 const thS = { ...cellS, textAlign: 'left', fontWeight: 500, background: '#fafafa' };
 
-// Build initial expenses state from existing data or fresh
-function buildExpensesState(existingExpenses) {
-  const existing = existingExpenses || [];
-  // Fixed USD expenses - always present
-  const fixed = FIXED_EXPENSES.map((name) => {
-    const found = existing.find((e) => e.description === name && e.currency === 'USD');
-    return { description: name, amount: found?.amount || 0, currency: 'USD', _fixed: true };
-  });
-  // Wood purchase (RUB) - always one row
-  const woodFound = existing.find((e) => e.description === WOOD_EXPENSE_KEY && e.currency === 'RUB');
-  const wood = { description: WOOD_EXPENSE_KEY, amount: woodFound?.amount || 0, currency: 'RUB', _fixed: true };
-  // Extra custom expenses
-  const fixedNames = new Set([...FIXED_EXPENSES, WOOD_EXPENSE_KEY]);
-  const custom = existing.filter((e) => !fixedNames.has(e.description)).map((e) => ({ ...e, _fixed: false }));
-  return { fixed, wood, custom };
-}
-
-// Convert state back to flat expenses array for API
-function flattenExpenses(fixed, wood, custom) {
-  const all = [];
-  fixed.forEach((e) => { if (e.amount > 0) all.push({ description: e.description, amount: e.amount, currency: 'USD' }); });
-  if (wood.amount > 0) all.push({ description: wood.description, amount: wood.amount, currency: 'RUB' });
-  custom.forEach((e) => { if (e.description) all.push({ description: e.description, amount: e.amount || 0, currency: e.currency || 'USD' }); });
-  return all;
-}
-
-// ===================== EXPENSES TABLE (shared) =====================
-function ExpensesEditor({ fixed, wood, custom, onFixedChange, onWoodChange, onCustomChange, onCustomRemove, onCustomAdd, rate = 0, totalM3 = 0 }) {
-  const { t } = useLanguage();
-  const usdTotal = fixed.reduce((s, e) => s + (e.amount || 0), 0) + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
-  const woodUsd = rate > 0 && wood.amount > 0 ? wood.amount / rate : null;
-  const pricePerM3 = totalM3 > 0 && wood.amount > 0 ? wood.amount / totalM3 : (wood.pricePerM3 || 0);
-
-  const handlePriceChange = (v) => {
-    const p = v || 0;
-    onWoodChange({ amount: totalM3 > 0 ? Math.round(p * totalM3) : (wood.amount || 0), pricePerM3: p });
-  };
-  const handleAmountChange = (v) => {
-    const a = v || 0;
-    onWoodChange({ amount: a, pricePerM3: totalM3 > 0 ? a / totalM3 : 0 });
-  };
-
-  return (
-    <>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 4 }}>
-        <thead>
-          <tr>
-            <th style={thS}>Xarajat turi</th>
-            <th style={{ ...thS, width: 130, textAlign: 'right' }}>{t('pricePerM3')}</th>
-            <th style={{ ...thS, width: 130, textAlign: 'right' }}>Jami summa</th>
-          </tr>
-        </thead>
-        <tbody>
-          {/* Wood purchase (RUB) - FIRST row */}
-          <tr style={{ background: '#fffbe6', borderBottom: '1px solid #f0f0f0' }}>
-            <td style={{ ...cellS, fontWeight: 500 }}>
-              {WOOD_EXPENSE_KEY} <Tag color="orange" style={{ marginLeft: 4 }}>RUB</Tag>
-              {woodUsd && (
-                <Text type="secondary" style={{ fontSize: 11, marginLeft: 6 }}>
-                  ≈ {woodUsd.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} USD
-                </Text>
-              )}
-            </td>
-            <td style={{ ...cellS, textAlign: 'right' }}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0}
-                value={pricePerM3 ? Math.round(pricePerM3) : undefined}
-                onChange={handlePriceChange} placeholder="0" />
-            </td>
-            <td style={{ ...cellS, textAlign: 'right' }}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0}
-                value={wood.amount || undefined}
-                onChange={handleAmountChange} placeholder="0" />
-            </td>
-          </tr>
-          {/* Fixed USD expenses */}
-          {fixed.map((exp, idx) => (
-            <tr key={exp.description} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={cellS}>{exp.description}</td>
-              <td style={{ ...cellS, textAlign: 'right' }} />
-              <td style={{ ...cellS, textAlign: 'right' }}>
-                <InputNumber size="small" style={{ width: '100%' }} min={0}
-                  value={exp.amount} onChange={(v) => onFixedChange(idx, v || 0)} placeholder="0" />
-              </td>
-            </tr>
-          ))}
-          {/* Custom expenses */}
-          {custom.map((exp, idx) => (
-            <tr key={`custom-${idx}`} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={cellS}>
-                <Space size={4}>
-                  <Input size="small" value={exp.description} placeholder="Xarajat nomi"
-                    onChange={(e) => onCustomChange(idx, 'description', e.target.value)} style={{ width: 200 }} />
-                  <MinusCircleOutlined style={{ color: '#ff4d4f', cursor: 'pointer' }} onClick={() => onCustomRemove(idx)} />
-                </Space>
-              </td>
-              <td style={{ ...cellS, textAlign: 'right' }} />
-              <td style={{ ...cellS, textAlign: 'right' }}>
-                <InputNumber size="small" style={{ width: '100%' }} min={0}
-                  value={exp.amount} onChange={(v) => onCustomChange(idx, 'amount', v || 0)} placeholder="0" />
-              </td>
-            </tr>
-          ))}
-          <tr style={{ background: '#f6ffed' }}>
-            <td style={{ ...cellS, fontWeight: 600 }}>{t('totalUsd')}</td>
-            <td />
-            <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{usdTotal.toLocaleString('ru-RU')} USD</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <Button size="small" type="dashed" icon={<PlusOutlined />} onClick={onCustomAdd} style={{ marginBottom: 4 }}>
-        {t('addExpense')}
-      </Button>
-    </>
-  );
+// Extract wood purchase from expenses
+function getWoodExpense(expenses) {
+  const found = (expenses || []).find(e => e.description === WOOD_EXPENSE_KEY && e.currency === 'RUB');
+  return { description: WOOD_EXPENSE_KEY, amount: found?.amount || 0, currency: 'RUB' };
 }
 
 // ===================== CREATE MODAL =====================
@@ -162,15 +51,12 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   const [supplier, setSupplier] = useState(null);
   const [errors, setErrors] = useState({});
 
-  const initExp = buildExpensesState([]);
-  const [fixed, setFixed] = useState(initExp.fixed);
-  const [wood, setWood] = useState(initExp.wood);
-  const [custom, setCustom] = useState(initExp.custom);
+  const [wood, setWood] = useState({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
   const [bundles, setBundles] = useState([]);
 
   const handleOk = () => {
     const errs = {};
-    if (!isMashina && (!wagonCode || wagonCode.length !== 9)) errs.wagonCode = true;
+    if (!isMashina && (!wagonCode || wagonCode.length !== 8)) errs.wagonCode = true;
     if (isMashina && !wagonCode) errs.wagonCode = true;
     if (!origin) errs.origin = true;
     if (!destination) errs.destination = true;
@@ -179,21 +65,23 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       message.warning(t('mandatoryFields'));
       return;
     }
+    // Only wood purchase expense from create modal
+    const expenses = [];
+    if (wood.amount > 0) expenses.push({ description: WOOD_EXPENSE_KEY, amount: wood.amount, currency: 'RUB' });
     onSave({
       type: transportType,
       wagonCode, origin, destination,
       supplier: supplier || null,
       sentDate: sentDate?.toISOString() || null,
       arrivedDate: arrivedDate?.toISOString() || null,
-      expenses: flattenExpenses(fixed, wood, custom),
+      expenses,
       woodBundles: bundles.filter((b) => b.thickness && b.width && b.length && b.count),
     });
   };
 
   const handleAfterClose = () => {
     setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null); setSupplier(null);
-    const fresh = buildExpensesState([]);
-    setFixed(fresh.fixed); setWood(fresh.wood); setCustom(fresh.custom);
+    setWood({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
     setBundles([]); setErrors({});
   };
 
@@ -214,9 +102,9 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
                   status={errors.wagonCode ? 'error' : undefined} placeholder={t('truckCode')} />
               ) : (
                 <Input size="small" value={wagonCode}
-                  onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 9); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
-                  status={errors.wagonCode ? 'error' : undefined} placeholder="9 ta raqam"
-                  maxLength={9} suffix={<Text type="secondary">{wagonCode.length}/9</Text>} />
+                  onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 8); setWagonCode(v); if (v) setErrors((p) => ({ ...p, wagonCode: false })); }}
+                  status={errors.wagonCode ? 'error' : undefined} placeholder="8 ta raqam"
+                  maxLength={8} suffix={<Text type="secondary">{wagonCode.length}/8</Text>} />
               )}
             </td>
           </tr>
@@ -291,69 +179,59 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
         {t('addWood')}
       </Button>
 
-      {/* Expenses */}
-      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('expenses')}</Divider>
-      <ExpensesEditor
-        fixed={fixed} wood={wood} custom={custom} rate={globalRate}
-        onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-        onWoodChange={(v) => setWood((p) => ({ ...p, amount: v?.amount ?? v, pricePerM3: v?.pricePerM3 ?? p.pricePerM3 }))}
-        onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
-        onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
-        onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
-        totalM3={bundles.reduce((s, b) => {
-          if (!b.thickness || !b.width || !b.length || !b.count) return s;
-          return s + ((b.thickness * b.width * b.length) / 1e6) * b.count;
-        }, 0)}
-      />
-
-      {/* Tannarx real-time preview */}
+      {/* Wood purchase (RUB only) */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Yog'och xaridi (RUB)</Divider>
       {(() => {
-        const usdTotal = fixed.reduce((s, e) => s + (e.amount || 0), 0)
-          + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
-        const rubTotal = (wood.amount || 0)
-          + custom.filter(e => e.currency === 'RUB').reduce((s, e) => s + (e.amount || 0), 0);
-        const rate = globalRate || 0;
-        const rubInUsd = rate > 0 ? rubTotal / rate : 0;
-        const totalUsd = usdTotal + rubInUsd;
         const totalM3 = bundles.reduce((s, b) => {
           if (!b.thickness || !b.width || !b.length || !b.count) return s;
           return s + ((b.thickness * b.width * b.length) / 1e6) * b.count;
         }, 0);
-        const tannarx = totalM3 > 0 ? totalUsd / totalM3 : 0;
+        const pricePerM3 = totalM3 > 0 && wood.amount > 0 ? wood.amount / totalM3 : 0;
+        const rate = globalRate || 0;
+        const rubInUsd = rate > 0 ? (wood.amount || 0) / rate : 0;
+        const tannarx = totalM3 > 0 ? rubInUsd / totalM3 : 0;
         return (
-          <>
-            <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('costPreview')}</Divider>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <tbody>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
+                <td style={labelS}>Narx/m³ (RUB)</td>
+                <td style={{ ...cellS, textAlign: 'right' }}>
+                  <InputNumber size="small" style={{ width: '100%' }} min={0}
+                    value={pricePerM3 ? Math.round(pricePerM3) : undefined}
+                    onChange={(v) => setWood((p) => ({ ...p, amount: totalM3 > 0 ? Math.round((v || 0) * totalM3) : p.amount }))}
+                    placeholder="0" />
+                </td>
+              </tr>
+              <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
+                <td style={labelS}>Jami summa (RUB)</td>
+                <td style={{ ...cellS, textAlign: 'right' }}>
+                  <InputNumber size="small" style={{ width: '100%' }} min={0}
+                    value={wood.amount || undefined}
+                    onChange={(v) => setWood((p) => ({ ...p, amount: v || 0 }))}
+                    placeholder="0" />
+                </td>
+              </tr>
+              {rate > 0 && wood.amount > 0 && (
                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>{t('totalUsdExpenses')}</td>
-                  <td style={{ ...cellS, textAlign: 'right' }}>{usdTotal.toLocaleString('ru-RU')} USD</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
-                  <td style={labelS}>{t('woodPurchase')} → USD</td>
+                  <td style={labelS}>USD ekvivalent</td>
                   <td style={{ ...cellS, textAlign: 'right' }}>
-                    {rubTotal.toLocaleString('ru-RU')} RUB
-                    {rate > 0 ? ` ÷ ${rate} = ${rubInUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : ''}
-                    {rate === 0 && rubTotal > 0 && <Text type="danger" style={{ marginLeft: 8 }}>Kurs belgilanmagan!</Text>}
+                    {(wood.amount || 0).toLocaleString('ru-RU')} ÷ {rate} = {rubInUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD
                   </td>
                 </tr>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>{t('totalCost')}</td>
-                  <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{totalUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={labelS}>{t('totalM3')}</td>
-                  <td style={{ ...cellS, textAlign: 'right' }}>{totalM3.toFixed(4)} m³</td>
-                </tr>
+              )}
+              {rate === 0 && wood.amount > 0 && (
+                <tr><td colSpan={2} style={cellS}><Text type="danger">Kurs belgilanmagan!</Text></td></tr>
+              )}
+              {tannarx > 0 && (
                 <tr style={{ background: '#f6ffed' }}>
-                  <td style={{ ...labelS, fontWeight: 700 }}>{t('costPerM3')}</td>
+                  <td style={{ ...labelS, fontWeight: 700 }}>Tannarx/m³</td>
                   <td style={{ ...cellS, textAlign: 'right', fontWeight: 700, fontSize: 16, color: '#1677ff' }}>
-                    {tannarx > 0 ? `${tannarx.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : '—'}
+                    {tannarx.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </>
+              )}
+            </tbody>
+          </table>
         );
       })()}
     </Modal>
@@ -365,9 +243,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
   const { t } = useLanguage();
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
-  const [fixed, setFixed] = useState([]);
   const [wood, setWood] = useState({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
-  const [custom, setCustom] = useState([]);
   const [bundles, setBundles] = useState([]);
   const [deductOpen, setDeductOpen] = useState(false);
   const [deductBundleIdx, setDeductBundleIdx] = useState(null);
@@ -380,18 +256,20 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
       sentDate: wagon.sentDate, arrivedDate: wagon.arrivedDate, exchangeRate: wagon.exchangeRate || 0,
       supplier: wagon.supplier?._id || wagon.supplier || null,
     });
-    const exp = buildExpensesState(wagon.expenses);
-    setFixed(exp.fixed); setWood(exp.wood); setCustom(exp.custom);
+    setWood(getWoodExpense(wagon.expenses));
     setBundles((wagon.woodBundles || []).map((b) => ({ ...b, deductions: b.deductions || [] })));
     setEditMode(true);
   };
 
   const handleSave = () => {
+    // Preserve existing non-wood expenses, only update wood purchase
+    const existingNonWood = (wagon.expenses || []).filter(e => e.description !== WOOD_EXPENSE_KEY);
+    const woodExpense = wood.amount > 0 ? [{ description: WOOD_EXPENSE_KEY, amount: wood.amount, currency: 'RUB' }] : [];
     onUpdate({
       ...formData,
       sentDate: formData.sentDate || null,
       arrivedDate: formData.arrivedDate || null,
-      expenses: flattenExpenses(fixed, wood, custom),
+      expenses: [...woodExpense, ...existingNonWood],
       woodBundles: bundles,
     });
     setEditMode(false);
@@ -540,8 +418,8 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
                   wagon.type === 'mashina'
                     ? <Input size="small" value={formData.wagonCode}
                         onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase() }))} />
-                    : <Input size="small" value={formData.wagonCode} maxLength={9}
-                        onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/\D/g, '').slice(0, 9) }))} />],
+                    : <Input size="small" value={formData.wagonCode} maxLength={8}
+                        onChange={(e) => setFormData((p) => ({ ...p, wagonCode: e.target.value.replace(/\D/g, '').slice(0, 8) }))} />],
                 [t('sentDate'), <DatePicker size="small" style={{ width: '100%' }} value={formData.sentDate ? dayjs(formData.sentDate) : null}
                   onChange={(d) => setFormData((p) => ({ ...p, sentDate: d?.toISOString() || null }))} />],
                 [t('arrivedDate'), <DatePicker size="small" style={{ width: '100%' }} value={formData.arrivedDate ? dayjs(formData.arrivedDate) : null}
@@ -600,68 +478,50 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
             {t('addWood')}
           </Button>
 
-          {/* Edit expenses */}
-          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('expenses')}</Divider>
-          <ExpensesEditor
-            fixed={fixed} wood={wood} custom={custom} rate={globalRate}
-            onFixedChange={(idx, v) => setFixed((p) => p.map((e, i) => i === idx ? { ...e, amount: v } : e))}
-            onWoodChange={(v) => setWood((p) => ({ ...p, amount: v?.amount ?? v, pricePerM3: v?.pricePerM3 ?? p.pricePerM3 }))}
-            onCustomChange={(idx, key, v) => setCustom((p) => p.map((e, i) => i === idx ? { ...e, [key]: v } : e))}
-            onCustomRemove={(idx) => setCustom((p) => p.filter((_, i) => i !== idx))}
-            onCustomAdd={() => setCustom((p) => [...p, { description: '', amount: 0, currency: 'USD' }])}
-            totalM3={bundles.reduce((s, b) => s + (b.totalM3 || (b.thickness && b.width && b.length && b.count ? (b.thickness * b.width * b.length / 1e6) * b.count : 0)), 0)}
-          />
-
-          {/* Edit mode tannarx preview */}
+          {/* Edit wood purchase only — other expenses managed in Expenses page */}
+          <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Yog'och xaridi (RUB)</Divider>
           {(() => {
-            const editUsd = fixed.reduce((s, e) => s + (e.amount || 0), 0)
-              + custom.filter(e => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
-            const editRub = (wood.amount || 0)
-              + custom.filter(e => e.currency === 'RUB').reduce((s, e) => s + (e.amount || 0), 0);
-            const editRate = formData.exchangeRate || globalRate || 0;
-            const editRubInUsd = editRate > 0 ? editRub / editRate : 0;
-            const editTotalUsd = editUsd + editRubInUsd;
             const editM3 = bundles.reduce((s, b) => {
               if (!b.thickness || !b.width || !b.length || !b.count) return s;
               const deducted = (b.deductions || []).reduce((ds, d) => ds + (d.count || 0), 0);
               const remaining = b.count - deducted;
               return s + ((b.thickness * b.width * b.length) / 1e6) * remaining;
             }, 0);
-            const editTannarx = editM3 > 0 ? editTotalUsd / editM3 : 0;
+            const editRate = formData.exchangeRate || globalRate || 0;
+            const woodRub = wood.amount || 0;
+            const woodUsd = editRate > 0 ? woodRub / editRate : 0;
+            const pricePerM3 = editM3 > 0 && woodRub > 0 ? woodRub / editM3 : 0;
             return (
-              <>
-                <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>{t('costPreview')}</Divider>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <tbody>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
+                    <td style={labelS}>Narx/m³ (RUB)</td>
+                    <td style={{ ...cellS, textAlign: 'right' }}>
+                      <InputNumber size="small" style={{ width: '100%' }} min={0}
+                        value={pricePerM3 ? Math.round(pricePerM3) : undefined}
+                        onChange={(v) => setWood((p) => ({ ...p, amount: editM3 > 0 ? Math.round((v || 0) * editM3) : p.amount }))}
+                        placeholder="0" />
+                    </td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
+                    <td style={labelS}>Jami summa (RUB)</td>
+                    <td style={{ ...cellS, textAlign: 'right' }}>
+                      <InputNumber size="small" style={{ width: '100%' }} min={0}
+                        value={woodRub || undefined}
+                        onChange={(v) => setWood((p) => ({ ...p, amount: v || 0 }))}
+                        placeholder="0" />
+                    </td>
+                  </tr>
+                  {editRate > 0 && woodRub > 0 && (
                     <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>{t('totalUsdExpenses')}</td>
-                      <td style={{ ...cellS, textAlign: 'right' }}>{editUsd.toLocaleString('ru-RU')} USD</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#fffbe6' }}>
-                      <td style={labelS}>{t('rubInUsd')}</td>
+                      <td style={labelS}>USD ekvivalent</td>
                       <td style={{ ...cellS, textAlign: 'right' }}>
-                        {editRub.toLocaleString('ru-RU')} RUB
-                        {editRate > 0 ? ` ÷ ${editRate} = ${editRubInUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : ''}
-                        {editRate === 0 && editRub > 0 && <Text type="danger" style={{ marginLeft: 8 }}>Kurs belgilanmagan!</Text>}
+                        {woodRub.toLocaleString('ru-RU')} ÷ {editRate} = {woodUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD
                       </td>
                     </tr>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>{t('totalCost')}</td>
-                      <td style={{ ...cellS, textAlign: 'right', fontWeight: 600 }}>{editTotalUsd.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD</td>
-                    </tr>
-                    <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={labelS}>{t('totalM3')}</td>
-                      <td style={{ ...cellS, textAlign: 'right' }}>{editM3.toFixed(4)} m³</td>
-                    </tr>
-                    <tr style={{ background: '#f6ffed' }}>
-                      <td style={{ ...labelS, fontWeight: 700 }}>{t('costPerM3')}</td>
-                      <td style={{ ...cellS, textAlign: 'right', fontWeight: 700, fontSize: 16, color: '#1677ff' }}>
-                        {editTannarx > 0 ? `${editTannarx.toLocaleString('ru-RU', { maximumFractionDigits: 2 })} USD` : '—'}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
+                  )}
+                </tbody>
+              </table>
             );
           })()}
 

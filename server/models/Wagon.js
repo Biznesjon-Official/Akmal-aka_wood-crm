@@ -35,7 +35,21 @@ woodBundleSchema.pre('validate', function () {
 
 const wagonSchema = new mongoose.Schema({
   type: { type: String, enum: ['vagon', 'mashina'], default: 'vagon' },
-  wagonCode: { type: String, required: true },
+  wagonCode: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function (v) {
+        // ASTATKA is a special wagon, skip validation
+        if (v === 'ASTATKA') return true;
+        // Mashina type: any alphanumeric code
+        if (this.type === 'mashina') return v.length > 0;
+        // Vagon type: exactly 8 digits
+        return /^\d{8}$/.test(v);
+      },
+      message: 'Vagon kodi 8 ta raqamdan iborat bo\'lishi kerak',
+    },
+  },
   status: {
     type: String,
     enum: ['kelyapti', 'faol', 'omborda', 'sotildi'],

@@ -5,7 +5,7 @@ import {
   Row, Col, Card, Segmented,
 } from 'antd';
 const { RangePicker } = DatePicker;
-import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined, AppstoreOutlined, BarsOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, ShoppingCartOutlined, AppstoreOutlined, BarsOutlined, EyeOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
@@ -22,6 +22,8 @@ export default function Sales() {
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState('table');
   const [filters, setFilters] = useState({ from: undefined, to: undefined });
+  const [customerFilter, setCustomerFilter] = useState(null);
+  const [detailSale, setDetailSale] = useState(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { items: cartItems, removeItem, updateQuantity, clearCart, cartCount } = useCart();
@@ -45,7 +47,6 @@ export default function Sales() {
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
     queryFn: getCustomers,
-    enabled: open,
   });
 
   // Open modal from cart navigation
@@ -332,14 +333,19 @@ export default function Sales() {
     },
   ];
 
+  const filteredSales = customerFilter
+    ? sales.filter(s => (s.customer?._id || s.customer) === customerFilter)
+    : sales;
+
   const renderSaleCards = () => (
     <Row gutter={[16, 16]}>
-      {sales.map((sale) => {
+      {filteredSales.map((sale) => {
         const debt = (sale.totalAmount || 0) - (sale.paidAmount || 0);
         const isPaid = debt <= 0;
         return (
           <Col xs={24} sm={12} lg={8} xl={6} key={sale._id}>
-            <Card className={`grid-card sale-card ${isPaid ? 'paid' : debt > 0 ? 'has-debt' : ''}`}>
+            <Card className={`grid-card sale-card ${isPaid ? 'paid' : debt > 0 ? 'has-debt' : ''}`}
+              onClick={() => setDetailSale(sale)} style={{ cursor: 'pointer' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <Text strong style={{ fontSize: 15 }}>{sale.customer?.name || '—'}</Text>
                 <Text type="secondary" style={{ fontSize: 12 }}>{formatDate(sale.date)}</Text>
@@ -381,7 +387,17 @@ export default function Sales() {
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
         </Space>
-        <Space>
+        <Space wrap>
+          <Select
+            placeholder={t('customer')}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            value={customerFilter}
+            onChange={setCustomerFilter}
+            style={{ width: 160 }}
+            options={customers.map(c => ({ value: c._id, label: c.name }))}
+          />
           <RangePicker
             onChange={(dates) => setFilters({
               from: dates?.[0]?.startOf('day').toISOString(),
@@ -418,12 +434,54 @@ export default function Sales() {
       {viewMode === 'card' ? renderSaleCards() : (
         <Table
           columns={columns}
-          dataSource={sales}
+          dataSource={filteredSales}
           rowKey="_id"
           loading={isLoading}
           pagination={{ pageSize: 20 }}
+          onRow={(record) => ({ onClick: () => setDetailSale(record), style: { cursor: 'pointer' } })}
         />
       )}
+
+      {/* Sale detail modal */}
+      <Modal
+        title={detailSale ? `${t('salesPage')} — ${detailSale.customer?.name || ''}` : ''}
+        open={!!detailSale}
+        onCancel={() => setDetailSale(null)}
+        footer={null}
+        width={700}
+      >
+        {detailSale && (() => {
+          const debt = (detailSale.totalAmount || 0) - (detailSale.paidAmount || 0);
+          return (
+            <>
+              <Row gutter={16} style={{ marginBottom: 16 }}>
+                <Col span={6}><Text type="secondary">{t('date')}</Text><br /><Text strong>{formatDate(detailSale.date)}</Text></Col>
+                <Col span={6}><Text type="secondary">{t('totalSale')}</Text><br /><Text strong>{formatMoney(detailSale.totalAmount, detailSale.currency)}</Text></Col>
+                <Col span={6}><Text type="secondary">{t('paid')}</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(detailSale.paidAmount, detailSale.currency)}</Text></Col>
+                <Col span={6}><Text type="secondary">{t('debt')}</Text><br /><Text strong style={{ color: debt > 0 ? '#ff4d4f' : '#52c41a' }}>{formatMoney(debt, detailSale.currency)}</Text></Col>
+              </Row>
+              {detailSale.note && <div style={{ marginBottom: 12 }}><Text type="secondary">{t('note')}: </Text><Text>{detailSale.note}</Text></div>}
+              <Table
+                size="small"
+                pagination={false}
+                dataSource={detailSale.items || []}
+                rowKey={(_, i) => i}
+                columns={[
+                  { title: 'Vagon', key: 'wagon', render: (_, item) => item.wagon?.wagonCode || '—' },
+                  { title: t('size'), key: 'size', render: (_, item) => {
+                    const b = item.wagon?.woodBundles?.[item.bundleIndex];
+                    return b ? `${b.thickness}×${b.width}mm × ${b.length}m` : '—';
+                  }},
+                  { title: t('count'), dataIndex: 'quantity', key: 'quantity' },
+                  { title: 'm³', key: 'm3', render: (_, item) => formatM3(item.totalM3 || (item.m3PerPiece || 0) * (item.quantity || 0)) },
+                  { title: t('pricePerPiece'), dataIndex: 'pricePerPiece', key: 'price', render: (v) => formatMoney(v, detailSale.currency) },
+                  { title: t('amount'), dataIndex: 'totalAmount', key: 'total', render: (v) => <Text strong>{formatMoney(v, detailSale.currency)}</Text> },
+                ]}
+              />
+            </>
+          );
+        })()}
+      </Modal>
 
       <Modal
         title={`${t('newSale')} (${cartItems.length} mahsulot)`}

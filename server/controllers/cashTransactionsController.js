@@ -2,12 +2,13 @@ const CashTransaction = require('../models/CashTransaction');
 
 exports.getAll = async (req, res, next) => {
   try {
-    const { type, category, source, from, to, account } = req.query;
+    const { type, category, source, from, to, account, relatedPerson } = req.query;
     const filter = {};
     if (type) filter.type = type;
     if (category) filter.category = category;
     if (source) filter.source = source;
     if (account) filter.account = account;
+    if (relatedPerson) filter.relatedPerson = relatedPerson;
     if (from || to) {
       filter.date = {};
       if (from) filter.date.$gte = new Date(from);
@@ -15,6 +16,7 @@ exports.getAll = async (req, res, next) => {
     }
     const transactions = await CashTransaction.find(filter)
       .populate('source', 'name')
+      .populate('relatedPerson', 'name')
       .sort({ date: -1 })
       .lean();
     res.json(transactions);

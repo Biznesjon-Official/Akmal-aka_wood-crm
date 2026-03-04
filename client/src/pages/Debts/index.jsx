@@ -4,7 +4,7 @@ import {
   Input, message, Tag, Typography, Space, Spin, Card, Tabs, Popconfirm,
   Row, Col, Progress, Timeline, Empty,
 } from 'antd';
-import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, DollarOutlined, EyeOutlined, CheckCircleOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
@@ -27,6 +27,7 @@ function MyDebtsSection() {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState(null);
+  const [search, setSearch] = useState('');
 
   const { data: debts = [], isLoading } = useQuery({
     queryKey: ['my-debts'],
@@ -118,8 +119,16 @@ function MyDebtsSection() {
   return (
     <>
       <Card style={{ marginBottom: 16 }}>
-        <Space size="large" align="center">
+        <Space size="large" align="center" wrap>
           <Title level={4} style={{ margin: 0 }}>{t('myDebtsTitle')}</Title>
+          <Input
+            placeholder="Qidirish..."
+            prefix={<SearchOutlined />}
+            allowClear
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 180 }}
+          />
           {totalUSD > 0 && (
             <Tag color="orange" style={{ fontSize: 16, padding: '4px 12px' }}>
               {t('total')}: {formatMoney(totalUSD, 'USD')}
@@ -140,7 +149,7 @@ function MyDebtsSection() {
         <Empty description={t('noDebts')} />
       ) : (
         <Row gutter={[16, 16]}>
-          {debts.map((debt) => {
+          {debts.filter(d => !search || d.creditor?.toLowerCase().includes(search.toLowerCase())).map((debt) => {
             const percent = debt.amount > 0 ? Math.round((debt.paidAmount / debt.amount) * 100) : 0;
             const isDone = debt.remainingDebt <= 0;
             return (
@@ -339,6 +348,7 @@ function LentDebtsSection() {
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState(null);
+  const [search, setSearch] = useState('');
 
   const { data: debts = [], isLoading } = useQuery({
     queryKey: ['lent-debts'],
@@ -430,8 +440,16 @@ function LentDebtsSection() {
   return (
     <>
       <Card style={{ marginBottom: 16 }}>
-        <Space size="large" align="center">
+        <Space size="large" align="center" wrap>
           <Title level={4} style={{ margin: 0 }}>{t('lentDebtsTitle')}</Title>
+          <Input
+            placeholder="Qidirish..."
+            prefix={<SearchOutlined />}
+            allowClear
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 180 }}
+          />
           {totalUSD > 0 && (
             <Tag color="blue" style={{ fontSize: 16, padding: '4px 12px' }}>
               {t('total')}: {formatMoney(totalUSD, 'USD')}
@@ -452,7 +470,7 @@ function LentDebtsSection() {
         <Empty description={t('noLentDebts')} />
       ) : (
         <Row gutter={[16, 16]}>
-          {debts.map((debt) => {
+          {debts.filter(d => !search || d.debtor?.toLowerCase().includes(search.toLowerCase())).map((debt) => {
             const percent = debt.amount > 0 ? Math.round((debt.paidAmount / debt.amount) * 100) : 0;
             const isDone = debt.remainingDebt <= 0;
             return (

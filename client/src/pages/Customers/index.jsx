@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, message, Popconfirm, Space, Drawer, Tag, Row, Col, Card, Segmented, Typography, Descriptions } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, DollarOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, message, Popconfirm, Space, Drawer, Tag, Row, Col, Card, Segmented, Typography, Descriptions, Tabs } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, DollarOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments, createPayment, deletePayment, createLentDebt } from '../../api';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments, createPayment, deletePayment, createLentDebt, getDeliveries, getLentDebts, getCashTransactions } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
@@ -13,6 +13,7 @@ const { Text } = Typography;
 const Customers = () => {
   const { t } = useLanguage();
   const [viewMode, setViewMode] = useState('table');
+  const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [modalOpen, setModalOpen] = useState(false);
@@ -39,6 +40,24 @@ const Customers = () => {
   const { data: customerPayments } = useQuery({
     queryKey: ['customer-payments', selectedCustomer?._id],
     queryFn: () => getPayments({ customer: selectedCustomer._id }),
+    enabled: !!selectedCustomer?._id,
+  });
+
+  const { data: customerDeliveries = [] } = useQuery({
+    queryKey: ['customer-deliveries', selectedCustomer?._id],
+    queryFn: () => getDeliveries({ customer: selectedCustomer._id }),
+    enabled: !!selectedCustomer?._id,
+  });
+
+  const { data: customerLentDebts = [] } = useQuery({
+    queryKey: ['customer-lent-debts', selectedCustomer?.name],
+    queryFn: () => getLentDebts({ debtor: selectedCustomer.name }),
+    enabled: !!selectedCustomer?.name,
+  });
+
+  const { data: customerTransactions = [] } = useQuery({
+    queryKey: ['customer-transactions', selectedCustomer?._id],
+    queryFn: () => getCashTransactions({ relatedPerson: selectedCustomer._id }),
     enabled: !!selectedCustomer?._id,
   });
 
@@ -329,9 +348,11 @@ const Customers = () => {
     },
   ];
 
+  const filteredCustomers = (customers || []).filter(c => !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
+
   const renderCustomerCards = () => (
     <Row gutter={[16, 16]}>
-      {(customers || []).map((c) => (
+      {filteredCustomers.map((c) => (
         <Col xs={24} sm={12} lg={8} xl={6} key={c._id}>
           <Card className="grid-card customer-card">
             <div className="grid-card-title">{c.name}</div>
@@ -361,14 +382,22 @@ const Customers = () => {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Space>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+        <Space wrap>
           <h2 style={{ margin: 0 }}>{t('customersPage')}</h2>
           <Segmented value={viewMode} onChange={setViewMode}
             options={[
               { value: 'card', icon: <AppstoreOutlined /> },
               { value: 'table', icon: <BarsOutlined /> },
             ]} />
+          <Input
+            placeholder={t('search') || 'Qidirish...'}
+            prefix={<SearchOutlined />}
+            allowClear
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 200 }}
+          />
         </Space>
         <Space>
           <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
@@ -394,7 +423,11 @@ const Customers = () => {
       </Card>
 
       {viewMode === 'card' ? renderCustomerCards() : (
-        <Table rowKey="_id" columns={columns} dataSource={customers} loading={isLoading} />
+        <Table rowKey="_id" columns={columns}
+          dataSource={(customers || []).filter(c => !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search))}
+          loading={isLoading}
+          onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+        />
       )}
 
       {/* Create / Edit Modal */}
@@ -455,24 +488,88 @@ const Customers = () => {
               </Row>
             </Card>
 
-            <h3 style={{ marginBottom: 8 }}>
-              {t('salesHistory')}
-              {customerSales && (
-                <Text type="secondary" style={{ fontSize: 13, fontWeight: 400, marginLeft: 8 }}>
-                  ({customerSales.length} {t('salesCount')})
-                </Text>
-              )}
-            </h3>
-            <Table
-              rowKey="_id"
-              columns={salesColumns}
-              dataSource={customerSales}
-              loading={salesLoading}
-              size="small"
-              pagination={false}
-              expandable={{ expandedRowRender }}
-              locale={{ emptyText: t('noSales') }}
-            />
+            <Tabs defaultActiveKey="sales" items={[
+              {
+                key: 'sales',
+                label: `${t('salesHistory')} (${(customerSales || []).length})`,
+                children: (
+                  <Table
+                    rowKey="_id"
+                    columns={salesColumns}
+                    dataSource={customerSales}
+                    loading={salesLoading}
+                    size="small"
+                    pagination={false}
+                    expandable={{ expandedRowRender }}
+                    locale={{ emptyText: t('noSales') }}
+                  />
+                ),
+              },
+              {
+                key: 'deliveries',
+                label: `Yetkazmalar (${customerDeliveries.length})`,
+                children: (
+                  <Table
+                    rowKey="_id"
+                    dataSource={customerDeliveries}
+                    size="small"
+                    pagination={false}
+                    locale={{ emptyText: 'Yetkazmalar yo\'q' }}
+                    columns={[
+                      { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode' },
+                      { title: t('date'), dataIndex: 'sentDate', key: 'sentDate', render: formatDate },
+                      { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => <Tag color={v === 'yakunlandi' ? 'green' : v === 'yetkazildi' ? 'blue' : 'orange'}>{v}</Tag> },
+                      { title: 'Qarz', key: 'debt', render: (_, r) => formatMoney(r.totalDebt, 'USD') },
+                      { title: "To'langan", key: 'paid', render: (_, r) => <Text style={{ color: '#52c41a' }}>{formatMoney(r.paidAmount, 'USD')}</Text> },
+                      { title: 'Qoldiq', key: 'remaining', render: (_, r) => r.remainingDebt > 0 ? <Text type="danger">{formatMoney(r.remainingDebt, 'USD')}</Text> : <Tag color="green">To'liq</Tag> },
+                    ]}
+                  />
+                ),
+              },
+              {
+                key: 'debts',
+                label: `Qarzlar (${customerLentDebts.length})`,
+                children: (
+                  <Table
+                    rowKey="_id"
+                    dataSource={customerLentDebts}
+                    size="small"
+                    pagination={false}
+                    locale={{ emptyText: 'Qarzlar yo\'q' }}
+                    columns={[
+                      { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                      { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v, r) => formatMoney(v, r.currency) },
+                      { title: "To'langan", key: 'paid', render: (_, r) => formatMoney(r.paidAmount, r.currency) },
+                      { title: 'Qoldiq', key: 'remaining', render: (_, r) => r.remainingDebt > 0 ? <Text type="danger">{formatMoney(r.remainingDebt, r.currency)}</Text> : <Tag color="green">To'liq</Tag> },
+                      { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+                    ]}
+                  />
+                ),
+              },
+              {
+                key: 'transactions',
+                label: `Tranzaksiyalar (${customerTransactions.length})`,
+                children: (
+                  <Table
+                    rowKey="_id"
+                    dataSource={customerTransactions}
+                    size="small"
+                    pagination={false}
+                    locale={{ emptyText: 'Tranzaksiyalar yo\'q' }}
+                    columns={[
+                      { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                      { title: t('type'), dataIndex: 'type', key: 'type', render: (v) => <Tag color={v === 'kirim' ? 'green' : 'red'}>{v === 'kirim' ? 'Kirim' : 'Chiqim'}</Tag> },
+                      { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v, r) => (
+                        <Text style={{ color: r.type === 'chiqim' ? '#cf1322' : '#389e0d', fontWeight: 500 }}>
+                          {r.type === 'chiqim' ? '−' : '+'}{formatMoney(v, r.currency)}
+                        </Text>
+                      )},
+                      { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+                    ]}
+                  />
+                ),
+              },
+            ]} />
           </>
         )}
       </Drawer>

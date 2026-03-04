@@ -124,7 +124,7 @@ export const deleteMyDebt = (id) =>
   api.delete(`/my-debts/${id}`).then((r) => r.data);
 
 // Lent Debts (mendan qarzdarlar)
-export const getLentDebts = () => api.get("/lent-debts").then((r) => r.data);
+export const getLentDebts = (params) => api.get("/lent-debts", { params }).then((r) => r.data);
 export const createLentDebt = (data) =>
   api.post("/lent-debts", data).then((r) => r.data);
 export const addLentDebtPayment = (id, data) =>

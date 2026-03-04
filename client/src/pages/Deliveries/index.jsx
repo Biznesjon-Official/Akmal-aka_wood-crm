@@ -5,7 +5,7 @@ import {
   message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress,
 } from 'antd';
 import {
-  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined,
+  PlusOutlined, DeleteOutlined, EditOutlined, CheckCircleOutlined, DollarOutlined, CreditCardOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
@@ -35,6 +35,11 @@ export default function Deliveries() {
   const [statusFilter, setStatusFilter] = useState('');
   const [customerTyped, setCustomerTyped] = useState('');
   const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [detailDelivery, setDetailDelivery] = useState(null);
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const [bulkCustomerId, setBulkCustomerId] = useState(null);
+  const [bulkAmounts, setBulkAmounts] = useState({});
+  const [bulkPayLoading, setBulkPayLoading] = useState(false);
 
   const STATUS_LABEL = {
     "yo'lda": t('onRoad'),
@@ -251,7 +256,8 @@ export default function Deliveries() {
     const pct = d.totalDebt > 0 ? Math.min(100, Math.round((d.paidAmount / d.totalDebt) * 100)) : 0;
     return (
       <Col xs={24} sm={12} lg={8} xl={6} key={d._id}>
-        <Card size="small" style={{ borderLeft: `4px solid ${STATUS_COLOR[d.status] === 'green' ? '#52c41a' : STATUS_COLOR[d.status] === 'blue' ? '#1677ff' : '#fa8c16'}`, borderRadius: 8 }}>
+        <Card size="small" style={{ borderLeft: `4px solid ${STATUS_COLOR[d.status] === 'green' ? '#52c41a' : STATUS_COLOR[d.status] === 'blue' ? '#1677ff' : '#fa8c16'}`, borderRadius: 8, cursor: 'pointer' }}
+          onClick={() => setDetailDelivery(d)}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
             <Text strong style={{ fontFamily: 'monospace' }}>{d.wagonCode || '—'}</Text>
             <Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag>
@@ -319,6 +325,9 @@ export default function Deliveries() {
             ]}
           />
         </Space>
+        <Button icon={<CreditCardOutlined />} onClick={() => { setBulkPayOpen(true); setBulkCustomerId(null); setBulkAmounts({}); }}>
+          Ommaviy to'lov
+        </Button>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>{t('newDelivery')}</Button>
       </div>
 
@@ -348,10 +357,63 @@ export default function Deliveries() {
       </Card>
 
       {viewMode === 'table' ? (
-        <Table columns={columns} dataSource={deliveries} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }} />
+        <Table columns={columns} dataSource={deliveries} rowKey="_id" loading={isLoading} pagination={{ pageSize: 20 }}
+          onRow={(record) => ({ onClick: () => setDetailDelivery(record), style: { cursor: 'pointer' } })} />
       ) : (
         <Row gutter={[16, 16]}>{deliveries.map(renderCard)}</Row>
       )}
+
+      {/* Detail Modal */}
+      <Modal
+        title={detailDelivery ? `${detailDelivery.wagonCode || '—'} — ${detailDelivery.customer?.name || ''}` : ''}
+        open={!!detailDelivery}
+        onCancel={() => setDetailDelivery(null)}
+        footer={null}
+        width={600}
+      >
+        {detailDelivery && (() => {
+          const d = detailDelivery;
+          const pct = d.totalDebt > 0 ? Math.min(100, Math.round((d.paidAmount / d.totalDebt) * 100)) : 0;
+          return (
+            <>
+              <Descriptions bordered size="small" column={2} style={{ marginBottom: 16 }}>
+                <Descriptions.Item label={t('status')}><Tag color={STATUS_COLOR[d.status]}>{STATUS_LABEL[d.status]}</Tag></Descriptions.Item>
+                <Descriptions.Item label={t('customer')}>{d.customer?.name || '—'}</Descriptions.Item>
+                <Descriptions.Item label={t('sentDateLabel')}>{formatDate(d.sentDate)}</Descriptions.Item>
+                <Descriptions.Item label={t('arrivedDateLabel')}>{d.arrivedDate ? formatDate(d.arrivedDate) : '—'}</Descriptions.Item>
+                {d.cargoType && <Descriptions.Item label={t('cargo')}>{d.cargoType}</Descriptions.Item>}
+                {d.cargoWeight > 0 && <Descriptions.Item label={t('weight')}>{d.cargoWeight} t</Descriptions.Item>}
+              </Descriptions>
+              <Descriptions bordered size="small" column={3} style={{ marginBottom: 16 }}>
+                {d.uzRate > 0 && <Descriptions.Item label={`UZ${d.uzCode ? ` (${d.uzCode})` : ''}`}>${d.uzRate}/t</Descriptions.Item>}
+                {d.kzRate > 0 && <Descriptions.Item label={`KZ${d.kzCode ? ` (${d.kzCode})` : ''}`}>${d.kzRate}/t</Descriptions.Item>}
+                {d.avgExpense > 0 && <Descriptions.Item label="AVG">{formatMoney(d.avgExpense, 'USD')}</Descriptions.Item>}
+                {d.kodExpense > 0 && <Descriptions.Item label="Kod">{formatMoney(d.kodExpense, 'USD')}</Descriptions.Item>}
+                {d.prastoy > 0 && <Descriptions.Item label="Prastoy">{formatMoney(d.prastoy, 'USD')}</Descriptions.Item>}
+              </Descriptions>
+              <Row gutter={16} style={{ marginBottom: 12 }}>
+                <Col span={8}><Text type="secondary">{t('totalDebt3')}</Text><br /><Text strong>{formatMoney(d.totalDebt, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('paid')}</Text><br /><Text strong style={{ color: '#52c41a' }}>{formatMoney(d.paidAmount, 'USD')}</Text></Col>
+                <Col span={8}><Text type="secondary">{t('remaining')}</Text><br /><Text strong style={{ color: '#ff4d4f' }}>{formatMoney(d.remainingDebt, 'USD')}</Text></Col>
+              </Row>
+              <Progress percent={pct} strokeColor={DEBT_COLOR[d.debtStatus]} />
+              {d.payments?.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <Text strong style={{ marginBottom: 8, display: 'block' }}>{t('paid')} ({d.payments.length})</Text>
+                  <Table
+                    size="small" pagination={false} dataSource={d.payments} rowKey="_id"
+                    columns={[
+                      { title: t('date'), dataIndex: 'date', key: 'date', render: formatDate },
+                      { title: t('amount'), dataIndex: 'amount', key: 'amount', render: (v) => <Text strong style={{ color: '#389e0d' }}>{formatMoney(v, 'USD')}</Text> },
+                      { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
+                    ]}
+                  />
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </Modal>
 
       {/* Create/Edit Modal */}
       <Modal
@@ -564,6 +626,95 @@ export default function Deliveries() {
             <Input placeholder={t('note')} />
           </Form.Item>
         </Form>
+      </Modal>
+      {/* Bulk Payment Modal */}
+      <Modal
+        title="Ommaviy to'lov"
+        open={bulkPayOpen}
+        onCancel={() => { setBulkPayOpen(false); setBulkCustomerId(null); setBulkAmounts({}); }}
+        width={700}
+        okText="To'lovlarni saqlash"
+        confirmLoading={bulkPayLoading}
+        onOk={async () => {
+          const entries = Object.entries(bulkAmounts).filter(([, v]) => v > 0);
+          if (entries.length === 0) { message.warning("Kamida bitta delivery uchun summa kiriting"); return; }
+          setBulkPayLoading(true);
+          try {
+            for (const [deliveryId, amount] of entries) {
+              await addDeliveryPayment(deliveryId, { amount, date: new Date().toISOString() });
+            }
+            invalidate();
+            message.success(`${entries.length} ta delivery uchun to'lov saqlandi`);
+            setBulkPayOpen(false);
+            setBulkCustomerId(null);
+            setBulkAmounts({});
+          } catch { message.error(t('error')); }
+          finally { setBulkPayLoading(false); }
+        }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Text strong>Mijozni tanlang:</Text>
+          <Select
+            style={{ width: '100%', marginTop: 4 }}
+            placeholder="Mijoz tanlang"
+            showSearch
+            filterOption={(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())}
+            value={bulkCustomerId}
+            onChange={(v) => { setBulkCustomerId(v); setBulkAmounts({}); }}
+            options={customers.map(c => ({ value: c._id, label: c.name }))}
+          />
+        </div>
+
+        {bulkCustomerId && (() => {
+          const custDeliveries = deliveries.filter(d =>
+            (d.customer?._id === bulkCustomerId || d.customer === bulkCustomerId) && d.remainingDebt > 0
+          );
+          const totalBulk = Object.values(bulkAmounts).reduce((s, v) => s + (v || 0), 0);
+          const totalRemain = custDeliveries.reduce((s, d) => s + d.remainingDebt, 0);
+
+          if (custDeliveries.length === 0) return <Text type="secondary">Bu mijozning to'lanmagan yetkazmalari yo'q</Text>;
+
+          return (
+            <>
+              <Table
+                size="small"
+                pagination={false}
+                dataSource={custDeliveries}
+                rowKey="_id"
+                columns={[
+                  { title: 'Vagon', dataIndex: 'wagonCode', key: 'wagonCode', width: 100 },
+                  { title: 'Jami qarz', key: 'totalDebt', width: 110, render: (_, r) => formatMoney(r.totalDebt, 'USD') },
+                  { title: 'Qoldiq', key: 'remaining', width: 110, render: (_, r) => <Text type="danger">{formatMoney(r.remainingDebt, 'USD')}</Text> },
+                  {
+                    title: "To'lov summasi", key: 'payment', width: 140,
+                    render: (_, r) => (
+                      <InputNumber
+                        size="small"
+                        style={{ width: '100%' }}
+                        min={0}
+                        max={r.remainingDebt}
+                        placeholder="0"
+                        value={bulkAmounts[r._id] || undefined}
+                        onChange={(v) => setBulkAmounts(prev => ({ ...prev, [r._id]: v || 0 }))}
+                        addonBefore="$"
+                      />
+                    ),
+                  },
+                ]}
+              />
+              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: '#f6ffed', borderRadius: 6 }}>
+                <div>
+                  <Text type="secondary">Jami qoldiq: </Text>
+                  <Text strong style={{ color: '#ff4d4f' }}>{formatMoney(totalRemain, 'USD')}</Text>
+                </div>
+                <div>
+                  <Text type="secondary">Jami to'lov: </Text>
+                  <Text strong style={{ color: '#52c41a', fontSize: 16 }}>{formatMoney(totalBulk, 'USD')}</Text>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </Modal>
     </div>
   );

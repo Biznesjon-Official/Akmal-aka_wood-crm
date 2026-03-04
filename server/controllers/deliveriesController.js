@@ -5,6 +5,7 @@ exports.getAll = async (req, res, next) => {
   try {
     const filter = {};
     if (req.query.status) filter.status = req.query.status;
+    if (req.query.customer) filter.customer = req.query.customer;
     const deliveries = await Delivery.find(filter)
       .populate('customer', 'name phone')
       .sort({ sentDate: -1 });
@@ -107,6 +108,8 @@ exports.addPayment = async (req, res, next) => {
       account: 'USD_account',
       description: `Yetkazma to'lov: ${delivery.wagonCode || ''} — ${delivery.customer?.name || ''}`,
       relatedDelivery: delivery._id,
+      relatedPerson: delivery.customer?._id || delivery.customer,
+      personModel: 'Customer',
       date: date || new Date(),
     });
 

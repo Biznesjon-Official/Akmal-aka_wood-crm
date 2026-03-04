@@ -20,6 +20,7 @@ const Cash = lazy(() => import('./pages/Cash'));
 const Transfers = lazy(() => import('./pages/Transfers'));
 const Deliveries = lazy(() => import('./pages/Deliveries'));
 const Suppliers = lazy(() => import('./pages/Suppliers'));
+const Expenses = lazy(() => import('./pages/Expenses'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/wagons" element={<Wagons />} />
               <Route path="/wagons/:id" element={<WagonDetail />} />
+              <Route path="/expenses" element={<Expenses />} />
               <Route path="/warehouse" element={<Warehouse />} />
               <Route path="/sales" element={<Sales />} />
               <Route path="/customers" element={<Customers />} />
