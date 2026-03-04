@@ -3,6 +3,7 @@ const c = require('../controllers/customersController');
 
 router.get('/', c.getAll);
 router.post('/', c.create);
+router.get('/debtors', c.getDebtors);
 router.get('/:id', c.getOne);
 router.put('/:id', c.update);
 router.delete('/:id', c.remove);

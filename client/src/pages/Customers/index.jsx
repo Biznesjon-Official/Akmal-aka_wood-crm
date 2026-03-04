@@ -3,7 +3,7 @@ import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, mes
 import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, DollarOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments, createPayment, deletePayment, createLentDebt, getDeliveries, getLentDebts, getCashTransactions } from '../../api';
+import { getCustomers, createCustomer, updateCustomer, deleteCustomer, getCustomerSales, getPayments, createPayment, deletePayment, createLentDebt, getDeliveries, getLentDebts, getCashTransactions, getDebtors } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
 import '../styles/cards.css';
@@ -12,6 +12,7 @@ const { Text } = Typography;
 
 const Customers = () => {
   const { t } = useLanguage();
+  const [pageTab, setPageTab] = useState('customers');
   const [viewMode, setViewMode] = useState('table');
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
@@ -29,6 +30,12 @@ const Customers = () => {
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: getCustomers,
+  });
+
+  const { data: debtors, isLoading: debtorsLoading } = useQuery({
+    queryKey: ['customer-debtors'],
+    queryFn: getDebtors,
+    enabled: pageTab === 'debtors',
   });
 
   const { data: customerSales, isLoading: salesLoading } = useQuery({
@@ -115,6 +122,7 @@ const Customers = () => {
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-debtors'] });
       message.success(t('paymentAdded'));
       setPayModalOpen(false);
       setPayingSale(null);
@@ -131,6 +139,7 @@ const Customers = () => {
       queryClient.invalidateQueries({ queryKey: ['cash-transactions'] });
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-debtors'] });
       message.success(t('deleted'));
     },
     onError: () => message.error(t('error')),
@@ -380,55 +389,121 @@ const Customers = () => {
     </Row>
   );
 
+  const debtorColumns = [
+    { title: t('name'), dataIndex: 'name', key: 'name' },
+    { title: t('phone'), dataIndex: 'phone', key: 'phone' },
+    { title: t('totalSaleAmount'), dataIndex: 'totalSaleAmount', key: 'totalSaleAmount', render: (v) => formatMoney(v) },
+    { title: t('paid'), dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text style={{ color: '#52c41a' }}>{formatMoney(v)}</Text> },
+    { title: t('debt'), dataIndex: 'debt', key: 'debt', render: (v) => <Text type="danger" strong>{formatMoney(v)}</Text> },
+    {
+      title: '',
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Button
+          type="primary"
+          size="small"
+          icon={<DollarOutlined />}
+          onClick={(e) => { e.stopPropagation(); openDrawer(record); }}
+        >
+          {t('pay')}
+        </Button>
+      ),
+    },
+  ];
+
+  const totalDebtorsDebt = (debtors || []).reduce((s, d) => s + d.debt, 0);
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-        <Space wrap>
-          <h2 style={{ margin: 0 }}>{t('customersPage')}</h2>
-          <Segmented value={viewMode} onChange={setViewMode}
-            options={[
-              { value: 'card', icon: <AppstoreOutlined /> },
-              { value: 'table', icon: <BarsOutlined /> },
-            ]} />
-          <Input
-            placeholder={t('search') || 'Qidirish...'}
-            prefix={<SearchOutlined />}
-            allowClear
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: 200 }}
-          />
-        </Space>
-        <Space>
-          <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
-            Astatka qo'shish
-          </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            {t('addCustomer')}
-          </Button>
-        </Space>
-      </div>
+      <Tabs
+        activeKey={pageTab}
+        onChange={setPageTab}
+        items={[
+          {
+            key: 'customers',
+            label: `${t('customersPage')} (${(customers || []).length})`,
+            children: (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
+                  <Space wrap>
+                    <Segmented value={viewMode} onChange={setViewMode}
+                      options={[
+                        { value: 'card', icon: <AppstoreOutlined /> },
+                        { value: 'table', icon: <BarsOutlined /> },
+                      ]} />
+                    <Input
+                      placeholder={t('search') || 'Qidirish...'}
+                      prefix={<SearchOutlined />}
+                      allowClear
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      style={{ width: 200 }}
+                    />
+                  </Space>
+                  <Space>
+                    <Button icon={<PlusOutlined />} onClick={() => { astatkaForm.resetFields(); setAstatkaOpen(true); }}>
+                      Astatka qo&apos;shish
+                    </Button>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                      {t('addCustomer')}
+                    </Button>
+                  </Space>
+                </div>
 
-      <Card className="summary-card" style={{ marginBottom: 16 }}>
-        <div className="summary-stats">
-          <div className="summary-stat">
-            <span className="summary-stat-label">{t('totalCustomers')}</span>
-            <span className="summary-stat-value highlight">{(customers || []).length}</span>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-stat-label">{t('withPhone')}</span>
-            <span className="summary-stat-value">{(customers || []).filter(c => c.phone).length}</span>
-          </div>
-        </div>
-      </Card>
+                <Card className="summary-card" style={{ marginBottom: 16 }}>
+                  <div className="summary-stats">
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">{t('totalCustomers')}</span>
+                      <span className="summary-stat-value highlight">{(customers || []).length}</span>
+                    </div>
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">{t('withPhone')}</span>
+                      <span className="summary-stat-value">{(customers || []).filter(c => c.phone).length}</span>
+                    </div>
+                  </div>
+                </Card>
 
-      {viewMode === 'card' ? renderCustomerCards() : (
-        <Table rowKey="_id" columns={columns}
-          dataSource={(customers || []).filter(c => !search || c.name?.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search))}
-          loading={isLoading}
-          onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
-        />
-      )}
+                {viewMode === 'card' ? renderCustomerCards() : (
+                  <Table rowKey="_id" columns={columns}
+                    dataSource={filteredCustomers}
+                    loading={isLoading}
+                    onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+                  />
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'debtors',
+            label: `Qarzdorlar (${(debtors || []).length})`,
+            children: (
+              <>
+                <Card className="summary-card" style={{ marginBottom: 16 }}>
+                  <div className="summary-stats">
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">Jami qarzdorlar</span>
+                      <span className="summary-stat-value highlight">{(debtors || []).length}</span>
+                    </div>
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">Jami qarz</span>
+                      <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtorsDebt)}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                <Table
+                  rowKey="_id"
+                  columns={debtorColumns}
+                  dataSource={debtors}
+                  loading={debtorsLoading}
+                  onRow={(record) => ({ onClick: () => openDrawer(record), style: { cursor: 'pointer' } })}
+                />
+              </>
+            ),
+          },
+        ]}
+      />
 
       {/* Create / Edit Modal */}
       <Modal

@@ -54,6 +54,55 @@ exports.getSales = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.getDebtors = async (req, res, next) => {
+  try {
+    const sales = await Sale.find().lean();
+    const payments = await Payment.find().lean();
+
+    // Group payments by customer
+    const paymentsByCustomer = {};
+    payments.forEach(p => {
+      const cId = p.customer?.toString();
+      if (!cId) return;
+      paymentsByCustomer[cId] = (paymentsByCustomer[cId] || 0) + p.amount;
+    });
+
+    // Group sales by customer
+    const salesByCustomer = {};
+    sales.forEach(s => {
+      const cId = s.customer?.toString();
+      if (!cId) return;
+      if (!salesByCustomer[cId]) salesByCustomer[cId] = { totalAmount: 0, paidAmount: 0 };
+      salesByCustomer[cId].totalAmount += s.totalAmount || 0;
+      salesByCustomer[cId].paidAmount += s.paidAmount || 0;
+    });
+
+    // Calculate debt per customer
+    const debtorIds = [];
+    const debtMap = {};
+    for (const [cId, info] of Object.entries(salesByCustomer)) {
+      const extraPaid = paymentsByCustomer[cId] || 0;
+      const debt = info.totalAmount - info.paidAmount - extraPaid;
+      if (debt > 0) {
+        debtorIds.push(cId);
+        debtMap[cId] = { totalAmount: info.totalAmount, paidAmount: info.paidAmount + extraPaid, debt };
+      }
+    }
+
+    const customers = await Customer.find({ _id: { $in: debtorIds } }).lean();
+    const result = customers.map(c => ({
+      ...c,
+      totalSaleAmount: debtMap[c._id.toString()].totalAmount,
+      totalPaid: debtMap[c._id.toString()].paidAmount,
+      debt: debtMap[c._id.toString()].debt,
+    }));
+
+    // Sort by debt descending
+    result.sort((a, b) => b.debt - a.debt);
+    res.json(result);
+  } catch (err) { next(err); }
+};
+
 exports.getDebts = async (req, res, next) => {
   try {
     const sales = await Sale.find({ customer: req.params.id }).lean();
