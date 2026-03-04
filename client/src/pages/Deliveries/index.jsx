@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
-  Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, AutoComplete,
+  Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select, AutoComplete, Checkbox,
   message, Card, Typography, Tag, Space, Popconfirm, Segmented, Row, Col, Descriptions, Progress, Tabs, Divider,
 } from 'antd';
 import {
@@ -13,7 +13,7 @@ import {
   markDelivered, addDeliveryPayment, deleteDeliveryPayment,
   addDeliverySupplierPayment, deleteDeliverySupplierPayment,
   addDeliveryExpense, deleteDeliveryExpense,
-  getCustomers, createCustomer, getSuppliers, createSupplier,
+  getCustomers, createCustomer, getSuppliers, createSupplier, getWagons, addWagonExpense,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
@@ -68,6 +68,7 @@ export default function Deliveries() {
 
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
+  const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: () => getWagons() });
 
   const customerOptions = customers.map(c => ({ label: c.name, value: c.name, id: c._id }));
 
@@ -159,6 +160,7 @@ export default function Deliveries() {
     setNewSupplierName('');
     form.setFieldsValue({
       ...record,
+      wagon: record.wagon?._id || record.wagon || undefined,
       wagonCode: record.wagonCode || '',
       sender: record.sender?._id || record.sender || undefined,
       customerName: custName,
@@ -191,9 +193,14 @@ export default function Deliveries() {
         }
       }
 
+      // Get wagonCode from selected wagon
+      const selectedWagon = values.wagon ? wagons.find(w => w._id === values.wagon) : null;
+      const wagonCode = selectedWagon ? selectedWagon.wagonNumber : (values.wagonCode || '');
+
       const data = {
         ...values,
-        wagonCode: values.wagonCode || '',
+        wagon: values.wagon || null,
+        wagonCode,
         customer: customerId,
         sender: values.sender || null,
         sentDate: values.sentDate?.toISOString(),
@@ -587,8 +594,14 @@ export default function Deliveries() {
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Row gutter={12}>
             <Col span={12}>
-              <Form.Item name="wagonCode" label={t('wagonNumber')}>
-                <Input placeholder="V-001 (ixtiyoriy)" />
+              <Form.Item name="wagon" label={t('wagonNumber')}>
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Vagon tanlang (ixtiyoriy)"
+                  filterOption={(input, opt) => opt.label?.toLowerCase().includes(input.toLowerCase())}
+                  options={wagons.map(w => ({ value: w._id, label: w.wagonNumber || w._id }))}
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -815,8 +828,16 @@ export default function Deliveries() {
         okText="Qo'shish"
         cancelText={t('cancel')}
       >
-        <Form form={expenseForm} layout="vertical" onFinish={(values) => {
-          addExpenseMut.mutate({ id: expenseTarget._id, data: values });
+        <Form form={expenseForm} layout="vertical" onFinish={async (values) => {
+          const { addToWagon, ...expenseData } = values;
+          addExpenseMut.mutate({ id: expenseTarget._id, data: expenseData });
+          if (addToWagon && expenseTarget?.wagon) {
+            const wagonId = expenseTarget.wagon?._id || expenseTarget.wagon;
+            try {
+              await addWagonExpense(wagonId, { description: expenseData.description, amount: expenseData.amount });
+              queryClient.invalidateQueries({ queryKey: ['wagons'] });
+            } catch { /* delivery expense already added */ }
+          }
         }}>
           <Form.Item name="description" label="Tavsif" rules={[{ required: true, message: 'Tavsif kiriting' }]}>
             <Input placeholder="Masalan: Yukni tushirish, Kran xizmati..." />
@@ -833,6 +854,11 @@ export default function Deliveries() {
               </Form.Item>
             </Col>
           </Row>
+          {expenseTarget?.wagon && (
+            <Form.Item name="addToWagon" valuePropName="checked">
+              <Checkbox>Vagonga ham qo'shish ({expenseTarget.wagonCode || 'vagon'})</Checkbox>
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 
