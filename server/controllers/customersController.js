@@ -105,6 +105,17 @@ exports.getDebtors = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+exports.getWagons = async (req, res, next) => {
+  try {
+    const Wagon = require('../models/Wagon');
+    const wagons = await Wagon.find({ customer: req.params.id })
+      .populate('coder', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json(wagons);
+  } catch (err) { next(err); }
+};
+
 exports.getDebts = async (req, res, next) => {
   try {
     const sales = await Sale.find({ customer: req.params.id }).lean();

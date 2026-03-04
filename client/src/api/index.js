@@ -39,6 +39,8 @@ export const getCustomerSales = (id) =>
   api.get(`/customers/${id}/sales`).then((r) => r.data);
 export const getCustomerDebts = (id) =>
   api.get(`/customers/${id}/debts`).then((r) => r.data);
+export const getCustomerWagons = (id) =>
+  api.get(`/customers/${id}/wagons`).then((r) => r.data);
 export const getDebtors = () =>
   api.get('/customers/debtors').then((r) => r.data);
 

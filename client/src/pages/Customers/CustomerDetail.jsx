@@ -8,10 +8,10 @@ import {
 import { ArrowLeftOutlined, DollarOutlined, DeleteOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
-  getCustomer, getCustomerSales, getPayments, createPayment, deletePayment,
+  getCustomer, getCustomerSales, getCustomerWagons, getPayments, createPayment, deletePayment,
   getDeliveries, getLentDebts, getCashTransactions,
 } from '../../api';
-import { formatDate, formatMoney } from '../../utils/format';
+import { formatDate, formatMoney, formatM3, statusLabels, statusColors } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
 
 const { Text } = Typography;
@@ -58,6 +58,12 @@ export default function CustomerDetail() {
   const { data: customerTransactions = [] } = useQuery({
     queryKey: ['customer-transactions', id],
     queryFn: () => getCashTransactions({ relatedPerson: id }),
+    enabled: !!id,
+  });
+
+  const { data: customerWagons = [] } = useQuery({
+    queryKey: ['customer-wagons', id],
+    queryFn: () => getCustomerWagons(id),
     enabled: !!id,
   });
 
@@ -338,6 +344,27 @@ export default function CustomerDetail() {
                 { title: "To'langan", key: 'paid', render: (_, r) => formatMoney(r.paidAmount, r.currency) },
                 { title: 'Qoldiq', key: 'remaining', render: (_, r) => r.remainingDebt > 0 ? <Text type="danger">{formatMoney(r.remainingDebt, r.currency)}</Text> : <Tag color="green">To'liq</Tag> },
                 { title: t('note'), dataIndex: 'description', key: 'description', ellipsis: true },
+              ]}
+            />
+          ),
+        },
+        {
+          key: 'wagons',
+          label: `Vagonlar (${customerWagons.length})`,
+          children: (
+            <Table
+              rowKey="_id"
+              dataSource={customerWagons}
+              size="small"
+              pagination={false}
+              locale={{ emptyText: 'Vagonlar yo\'q' }}
+              columns={[
+                { title: 'Vagon kodi', dataIndex: 'wagonCode', key: 'wagonCode' },
+                { title: 'Status', dataIndex: 'status', key: 'status', render: (v) => <Tag color={statusColors[v]}>{statusLabels[v] || v}</Tag> },
+                { title: 'Yuborilgan', dataIndex: 'sentDate', key: 'sentDate', render: formatDate },
+                { title: 'Kodchi', key: 'coder', render: (_, r) => r.coder?.name || '—' },
+                { title: 'Jami m³', dataIndex: 'totalM3', key: 'totalM3', render: (v) => formatM3(v) },
+                { title: 'Tannarx', dataIndex: 'costPricePerM3', key: 'costPricePerM3', render: (v) => v ? formatMoney(v) : '—' },
               ]}
             />
           ),
