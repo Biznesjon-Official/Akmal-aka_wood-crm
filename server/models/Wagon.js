@@ -66,7 +66,8 @@ const wagonSchema = new mongoose.Schema({
   exchangeRate: { type: Number, default: 0 },
   costPricePerM3: { type: Number, default: 0 },
   woodBundles: [woodBundleSchema],
-  totalM3: { type: Number, default: 0 }
+  totalM3: { type: Number, default: 0 },
+  tonnage: { type: Number, default: 0 }
 }, { timestamps: true });
 
 wagonSchema.pre('save', async function () {
