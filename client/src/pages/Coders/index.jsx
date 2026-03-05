@@ -766,12 +766,6 @@ export default function Coders() {
                   <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvCargoWeight} onChange={setDlvCargoWeight} />
                 </td>
               </tr>
-              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                <td style={labelS}>Og'irlik yo'qotish (t)</td>
-                <td style={cellS}>
-                  <InputNumber size="small" style={{ width: '100%' }} min={0} value={dlvOgirlik} onChange={setDlvOgirlik} />
-                </td>
-              </tr>
 
               {/* Code selection from inventory */}
               <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
