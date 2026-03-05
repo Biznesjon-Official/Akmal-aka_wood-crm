@@ -5,7 +5,10 @@
       "Bash(npx eslint:*)",
       "Bash(git:*)",
       "Bash(npm run:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(npx vite:*)",
+      "Bash(ls:*)"
     ]
   }
 }

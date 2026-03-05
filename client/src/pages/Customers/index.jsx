@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Table, Button, Modal, Form, Input, InputNumber, Select, DatePicker, message, Popconfirm, Space, Row, Col, Card, Segmented, Typography, Tabs } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, DollarOutlined, SearchOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, EyeOutlined, AppstoreOutlined, BarsOutlined, PhoneOutlined, SearchOutlined } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer, createLentDebt, getDebtors } from '../../api';
@@ -41,11 +41,15 @@ const Customers = () => {
     enabled: pageTab === 'ozim',
   });
 
-  const { data: debtors, isLoading: debtorsLoading } = useQuery({
+  const { data: debtors } = useQuery({
     queryKey: ['customer-debtors'],
     queryFn: getDebtors,
-    enabled: pageTab === 'debtors',
   });
+
+  const debtMap = (debtors || []).reduce((map, d) => {
+    map[d._id] = d.debt;
+    return map;
+  }, {});
 
   const createMutation = useMutation({
     mutationFn: createCustomer,
@@ -131,6 +135,14 @@ const Customers = () => {
     { title: t('note'), dataIndex: 'note', key: 'note', ellipsis: true },
     { title: t('date'), dataIndex: 'createdAt', key: 'createdAt', render: (val) => formatDate(val) },
     {
+      title: t('debt'),
+      key: 'debt',
+      sorter: (a, b) => (debtMap[a._id] || 0) - (debtMap[b._id] || 0),
+      render: (_, record) => debtMap[record._id] > 0
+        ? <Text type="danger" strong>{formatMoney(debtMap[record._id])}</Text>
+        : '-',
+    },
+    {
       title: t('actions'),
       key: 'actions',
       render: (_, record) => (
@@ -166,6 +178,11 @@ const Customers = () => {
               </div>
             )}
             {c.note && <Text type="secondary" style={{ fontSize: 12 }} ellipsis>{c.note}</Text>}
+            {debtMap[c._id] > 0 && (
+              <div style={{ marginBottom: 4 }}>
+                <Text type="danger" strong>{t('debt')}: {formatMoney(debtMap[c._id])}</Text>
+              </div>
+            )}
             <div className="grid-card-footer">
               <Text type="secondary" style={{ fontSize: 11 }}>{formatDate(c.createdAt)}</Text>
               <Space size="small">
@@ -183,30 +200,7 @@ const Customers = () => {
     </Row>
   );
 
-  const debtorColumns = [
-    { title: t('name'), dataIndex: 'name', key: 'name' },
-    { title: t('phone'), dataIndex: 'phone', key: 'phone' },
-    { title: t('totalSaleAmount'), dataIndex: 'totalSaleAmount', key: 'totalSaleAmount', render: (v) => formatMoney(v) },
-    { title: t('paid'), dataIndex: 'totalPaid', key: 'totalPaid', render: (v) => <Text style={{ color: '#52c41a' }}>{formatMoney(v)}</Text> },
-    { title: t('debt'), dataIndex: 'debt', key: 'debt', render: (v) => <Text type="danger" strong>{formatMoney(v)}</Text> },
-    {
-      title: '',
-      key: 'action',
-      width: 100,
-      render: (_, record) => (
-        <Button
-          type="primary"
-          size="small"
-          icon={<DollarOutlined />}
-          onClick={(e) => { e.stopPropagation(); goToDetail(record); }}
-        >
-          {t('pay')}
-        </Button>
-      ),
-    },
-  ];
-
-  const totalDebtorsDebt = (debtors || []).reduce((s, d) => s + d.debt, 0);
+  const getTabDebtTotal = (list) => (list || []).reduce((s, c) => s + (debtMap[c._id] || 0), 0);
 
   return (
     <div>
@@ -255,6 +249,10 @@ const Customers = () => {
                       <span className="summary-stat-label">{t('withPhone')}</span>
                       <span className="summary-stat-value">{(customers || []).filter(c => c.phone).length}</span>
                     </div>
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">Jami qarz</span>
+                      <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(getTabDebtTotal(customers))}</span>
+                    </div>
                   </div>
                 </Card>
 
@@ -299,6 +297,10 @@ const Customers = () => {
                     <div className="summary-stat">
                       <span className="summary-stat-label">{t('totalAfghans')}</span>
                       <span className="summary-stat-value highlight">{(afghans || []).length}</span>
+                    </div>
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">Jami qarz</span>
+                      <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(getTabDebtTotal(afghans))}</span>
                     </div>
                   </div>
                 </Card>
@@ -345,6 +347,10 @@ const Customers = () => {
                       <span className="summary-stat-label">{t('totalOzim')}</span>
                       <span className="summary-stat-value highlight">{(ozimList || []).length}</span>
                     </div>
+                    <div className="summary-stat">
+                      <span className="summary-stat-label">Jami qarz</span>
+                      <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(getTabDebtTotal(ozimList))}</span>
+                    </div>
                   </div>
                 </Card>
 
@@ -355,34 +361,6 @@ const Customers = () => {
                     onRow={(record) => ({ onClick: () => goToDetail(record), style: { cursor: 'pointer' } })}
                   />
                 )}
-              </>
-            ),
-          },
-          {
-            key: 'debtors',
-            label: `Qarzdorlar (${(debtors || []).length})`,
-            children: (
-              <>
-                <Card className="summary-card" style={{ marginBottom: 16 }}>
-                  <div className="summary-stats">
-                    <div className="summary-stat">
-                      <span className="summary-stat-label">Jami qarzdorlar</span>
-                      <span className="summary-stat-value highlight">{(debtors || []).length}</span>
-                    </div>
-                    <div className="summary-stat">
-                      <span className="summary-stat-label">Jami qarz</span>
-                      <span className="summary-stat-value" style={{ color: '#ff4d4f' }}>{formatMoney(totalDebtorsDebt)}</span>
-                    </div>
-                  </div>
-                </Card>
-
-                <Table
-                  rowKey="_id"
-                  columns={debtorColumns}
-                  dataSource={debtors}
-                  loading={debtorsLoading}
-                  onRow={(record) => ({ onClick: () => goToDetail(record), style: { cursor: 'pointer' } })}
-                />
               </>
             ),
           },
