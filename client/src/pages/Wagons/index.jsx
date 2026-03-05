@@ -50,9 +50,12 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
   const [arrivedDate, setArrivedDate] = useState(null);
   const [supplier, setSupplier] = useState(null);
   const [tonnage, setTonnage] = useState(0);
+  const [codeUZName, setCodeUZName] = useState('');
   const [codeUZ, setCodeUZ] = useState(0);
-  const [codeKZ, setCodeKZ] = useState(0);
   const [coderUZ, setCoderUZ] = useState(null);
+  const [codeKZName, setCodeKZName] = useState('');
+  const [codeKZ, setCodeKZ] = useState(0);
+  const [coderKZ, setCoderKZ] = useState(null);
   const [errors, setErrors] = useState({});
 
   const [wood, setWood] = useState({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
@@ -73,8 +76,7 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
     }
     const expenses = [];
     if (wood.amount > 0) expenses.push({ description: WOOD_EXPENSE_KEY, amount: wood.amount, currency: 'RUB' });
-    if (codeUZ > 0) expenses.push({ description: 'Kod UZ', amount: codeUZ, currency: 'USD' });
-    if (codeKZ > 0) expenses.push({ description: 'Kod KZ', amount: codeKZ, currency: 'USD' });
+    // Kod xarajatlari endi expenses ga qo'shilmaydi, alohida fieldlarda saqlanadi
     FIXED_EXPENSES.forEach((name) => {
       const val = fixedExpenses[name];
       if (val > 0) expenses.push({ description: name, amount: val, currency: 'USD' });
@@ -86,8 +88,13 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       type: transportType,
       wagonCode, origin, destination,
       supplier: supplier || null,
-      coder: coderUZ || null,
       tonnage: tonnage || 0,
+      uzCode: codeUZName || undefined,
+      uzCostPerTon: codeUZ || 0,
+      coderUZ: coderUZ || undefined,
+      kzCode: codeKZName || undefined,
+      kzCostPerTon: codeKZ || 0,
+      coderKZ: coderKZ || undefined,
       sentDate: sentDate?.toISOString() || null,
       arrivedDate: arrivedDate?.toISOString() || null,
       expenses,
@@ -97,7 +104,8 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
 
   const handleAfterClose = () => {
     setWagonCode(''); setOrigin(''); setDestination(''); setSentDate(null); setArrivedDate(null); setSupplier(null);
-    setTonnage(0); setCodeUZ(0); setCodeKZ(0); setCoderUZ(null); setFixedExpenses({}); setExtraExpenses([]);
+    setTonnage(0); setCodeUZName(''); setCodeUZ(0); setCoderUZ(null);
+    setCodeKZName(''); setCodeKZ(0); setCoderKZ(null); setFixedExpenses({}); setExtraExpenses([]);
     setWood({ description: WOOD_EXPENSE_KEY, amount: 0, currency: 'RUB' });
     setBundles([]); setErrors({});
   };
@@ -152,14 +160,6 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-            <td style={labelS}>{t('supplier')}</td>
-            <td style={cellS}>
-              <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
-                value={supplier} onChange={setSupplier}
-                options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />
-            </td>
-          </tr>
-          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
             <td style={labelS}>Tonna</td>
             <td style={cellS}>
               <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
@@ -167,60 +167,49 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+            <td style={labelS}>Rus yetkazib beruvchi</td>
+            <td style={cellS}>
+              <Select size="small" style={{ width: '100%' }} allowClear placeholder="Tanlang"
+                value={supplier} onChange={setSupplier}
+                options={(suppliers || []).map(s => ({ value: s._id, label: s.name }))} />
+            </td>
+          </tr>
+          <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
             <td style={labelS}>Kod UZ</td>
             <td style={cellS}>
               <Space.Compact style={{ width: '100%' }}>
-                <InputNumber size="small" style={{ width: '50%' }} min={0} placeholder="Narx (USD)"
+                <Input size="small" style={{ width: '25%' }} placeholder="Kod nomi"
+                  value={codeUZName} onChange={(e) => setCodeUZName(e.target.value)} />
+                <InputNumber size="small" style={{ width: '25%' }} min={0} placeholder="$/t"
                   value={codeUZ || undefined} onChange={(v) => setCodeUZ(v || 0)} />
-                <Select size="small" style={{ width: '50%' }} allowClear placeholder="Kodchi"
+                <Select size="small" style={{ width: '30%' }} allowClear placeholder="Kodchi"
                   value={coderUZ} onChange={setCoderUZ} showSearch optionFilterProp="label"
                   options={(coders || []).map(c => ({ value: c._id, label: c.name }))} />
+                <InputNumber size="small" style={{ width: '20%' }} readOnly variant="filled"
+                  value={tonnage && codeUZ ? Math.round(tonnage * codeUZ * 100) / 100 : undefined}
+                  placeholder="Jami" suffix="$" />
               </Space.Compact>
             </td>
           </tr>
           <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
             <td style={labelS}>Kod KZ</td>
             <td style={cellS}>
-              <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="Narx (USD)"
-                value={codeKZ || undefined} onChange={(v) => setCodeKZ(v || 0)} />
+              <Space.Compact style={{ width: '100%' }}>
+                <Input size="small" style={{ width: '25%' }} placeholder="Kod nomi"
+                  value={codeKZName} onChange={(e) => setCodeKZName(e.target.value)} />
+                <InputNumber size="small" style={{ width: '25%' }} min={0} placeholder="$/t"
+                  value={codeKZ || undefined} onChange={(v) => setCodeKZ(v || 0)} />
+                <Select size="small" style={{ width: '30%' }} allowClear placeholder="Kodchi"
+                  value={coderKZ} onChange={setCoderKZ} showSearch optionFilterProp="label"
+                  options={(coders || []).map(c => ({ value: c._id, label: c.name }))} />
+                <InputNumber size="small" style={{ width: '20%' }} readOnly variant="filled"
+                  value={tonnage && codeKZ ? Math.round(tonnage * codeKZ * 100) / 100 : undefined}
+                  placeholder="Jami" suffix="$" />
+              </Space.Compact>
             </td>
           </tr>
         </tbody>
       </table>
-
-      {/* Xarajatlar */}
-      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar (USD)</Divider>
-      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
-        <tbody>
-          {FIXED_EXPENSES.map((name) => (
-            <tr key={name} style={{ borderBottom: '1px solid #f0f0f0' }}>
-              <td style={{ ...labelS, width: 160 }}>{name}</td>
-              <td style={cellS}>
-                <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
-                  value={fixedExpenses[name] || undefined}
-                  onChange={(v) => setFixedExpenses((p) => ({ ...p, [name]: v || 0 }))} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {extraExpenses.map((e, idx) => (
-        <div key={idx} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-          <Input size="small" style={{ flex: 1 }} placeholder="Nomi" value={e.description}
-            onChange={(ev) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, description: ev.target.value } : x))} />
-          <InputNumber size="small" style={{ width: 120 }} min={0} placeholder="Summa" value={e.amount || undefined}
-            onChange={(v) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, amount: v || 0 } : x))} />
-          <Select size="small" style={{ width: 80 }} value={e.currency}
-            onChange={(v) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, currency: v } : x))}
-            options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
-          <MinusCircleOutlined style={{ color: '#ff4d4f', cursor: 'pointer', lineHeight: '24px' }}
-            onClick={() => setExtraExpenses(p => p.filter((_, i) => i !== idx))} />
-        </div>
-      ))}
-      <Button size="small" type="dashed" icon={<PlusOutlined />} block style={{ marginBottom: 8 }}
-        onClick={() => setExtraExpenses(p => [...p, { description: '', amount: 0, currency: 'USD' }])}>
-        Qo'shimcha xarajat
-      </Button>
 
       {/* Wood bundles */}
       <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Yog'ochlar</Divider>
@@ -311,6 +300,40 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
           </table>
         );
       })()}
+
+      {/* Xarajatlar */}
+      <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar (USD)</Divider>
+      <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+        <tbody>
+          {FIXED_EXPENSES.map((name) => (
+            <tr key={name} style={{ borderBottom: '1px solid #f0f0f0' }}>
+              <td style={{ ...labelS, width: 160 }}>{name}</td>
+              <td style={cellS}>
+                <InputNumber size="small" style={{ width: '100%' }} min={0} placeholder="0"
+                  value={fixedExpenses[name] || undefined}
+                  onChange={(v) => setFixedExpenses((p) => ({ ...p, [name]: v || 0 }))} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {extraExpenses.map((e, idx) => (
+        <div key={idx} style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+          <Input size="small" style={{ flex: 1 }} placeholder="Nomi" value={e.description}
+            onChange={(ev) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, description: ev.target.value } : x))} />
+          <InputNumber size="small" style={{ width: 120 }} min={0} placeholder="Summa" value={e.amount || undefined}
+            onChange={(v) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, amount: v || 0 } : x))} />
+          <Select size="small" style={{ width: 80 }} value={e.currency}
+            onChange={(v) => setExtraExpenses(p => p.map((x, i) => i === idx ? { ...x, currency: v } : x))}
+            options={[{ value: 'USD', label: 'USD' }, { value: 'RUB', label: 'RUB' }]} />
+          <MinusCircleOutlined style={{ color: '#ff4d4f', cursor: 'pointer', lineHeight: '24px' }}
+            onClick={() => setExtraExpenses(p => p.filter((_, i) => i !== idx))} />
+        </div>
+      ))}
+      <Button size="small" type="dashed" icon={<PlusOutlined />} block style={{ marginBottom: 8 }}
+        onClick={() => setExtraExpenses(p => [...p, { description: '', amount: 0, currency: 'USD' }])}>
+        Qo'shimcha xarajat
+      </Button>
     </Modal>
   );
 }

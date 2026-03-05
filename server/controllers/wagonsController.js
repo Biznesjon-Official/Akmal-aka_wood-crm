@@ -11,27 +11,60 @@ function mapCategory(description) {
 }
 
 // Sync wagon expenses → CashTransaction records
-async function syncWagonCashTransactions(wagonId, expenses, transportType, supplierId) {
+async function syncWagonCashTransactions(wagonId, expenses, transportType, supplierId, wagon) {
   await CashTransaction.deleteMany({ relatedWagon: wagonId });
-  if (!expenses || expenses.length === 0) return;
   const prefix = transportType === 'mashina' ? 'Mashina' : 'Vagon';
-  const docs = expenses.map((e) => {
-    const doc = {
-      type: 'chiqim',
-      category: mapCategory(e.description),
-      amount: e.amount,
-      currency: e.currency || 'USD',
-      account: (e.currency || 'USD') === 'RUB' ? 'RUB_russia' : 'USD_account',
-      description: `${prefix}: ${e.description}`,
-      relatedWagon: wagonId,
-    };
-    if (supplierId) {
-      doc.relatedPerson = supplierId;
-      doc.personModel = 'Supplier';
+  const docs = [];
+
+  // Regular expenses
+  if (expenses && expenses.length > 0) {
+    for (const e of expenses) {
+      const doc = {
+        type: 'chiqim',
+        category: mapCategory(e.description),
+        amount: e.amount,
+        currency: e.currency || 'USD',
+        account: (e.currency || 'USD') === 'RUB' ? 'RUB_russia' : 'USD_account',
+        description: `${prefix}: ${e.description}`,
+        relatedWagon: wagonId,
+      };
+      if (supplierId) {
+        doc.relatedPerson = supplierId;
+        doc.personModel = 'Supplier';
+      }
+      docs.push(doc);
     }
-    return doc;
-  });
-  await CashTransaction.insertMany(docs);
+  }
+
+  // Code expenses (UZ/KZ per ton)
+  if (wagon) {
+    const uzTotal = (wagon.uzCostPerTon || 0) * (wagon.tonnage || 0);
+    if (uzTotal > 0) {
+      docs.push({
+        type: 'chiqim',
+        category: 'boshqa',
+        amount: uzTotal,
+        currency: 'USD',
+        account: 'USD_account',
+        description: `${prefix}: Kod UZ${wagon.uzCode ? ` (${wagon.uzCode})` : ''} — ${wagon.uzCostPerTon}$/t × ${wagon.tonnage}t`,
+        relatedWagon: wagonId,
+      });
+    }
+    const kzTotal = (wagon.kzCostPerTon || 0) * (wagon.tonnage || 0);
+    if (kzTotal > 0) {
+      docs.push({
+        type: 'chiqim',
+        category: 'boshqa',
+        amount: kzTotal,
+        currency: 'USD',
+        account: 'USD_account',
+        description: `${prefix}: Kod KZ${wagon.kzCode ? ` (${wagon.kzCode})` : ''} — ${wagon.kzCostPerTon}$/t × ${wagon.tonnage}t`,
+        relatedWagon: wagonId,
+      });
+    }
+  }
+
+  if (docs.length > 0) await CashTransaction.insertMany(docs);
 }
 
 exports.getAll = async (req, res, next) => {
@@ -45,7 +78,12 @@ exports.getAll = async (req, res, next) => {
       if (startDate) filter.sentDate.$gte = new Date(startDate);
       if (endDate) filter.sentDate.$lte = new Date(endDate);
     }
-    const wagons = await Wagon.find(filter).populate('supplier', 'name phone').sort({ createdAt: -1 }).lean();
+    const wagons = await Wagon.find(filter)
+      .populate('supplier', 'name phone')
+      .populate('coderUZ', 'name')
+      .populate('coderKZ', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
     res.json(wagons);
   } catch (err) { next(err); }
 };
@@ -61,7 +99,7 @@ exports.getOne = async (req, res, next) => {
 exports.create = async (req, res, next) => {
   try {
     const wagon = await Wagon.create(req.body);
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier, wagon);
     res.status(201).json(wagon);
   } catch (err) { next(err); }
 };
@@ -72,7 +110,7 @@ exports.update = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     Object.assign(wagon, req.body);
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier, wagon);
     res.json(wagon);
   } catch (err) { next(err); }
 };
@@ -129,7 +167,7 @@ exports.updateExpenses = async (req, res, next) => {
     if (!wagon) return res.status(404).json({ message: 'Vagon topilmadi' });
     wagon.expenses = req.body.expenses;
     await wagon.save();
-    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier);
+    await syncWagonCashTransactions(wagon._id, wagon.expenses, wagon.type, wagon.supplier, wagon);
     res.json(wagon);
   } catch (err) { next(err); }
 };

@@ -11,11 +11,18 @@ const codeSchema = new mongoose.Schema({
   assignedModel: { type: String, enum: ['Wagon', 'Delivery'] },
 }, { timestamps: true });
 
+const coderPaymentSchema = new mongoose.Schema({
+  amount: { type: Number, required: true },
+  date: { type: Date, default: Date.now },
+  note: String,
+}, { _id: true });
+
 const coderSchema = new mongoose.Schema({
   name: { type: String, required: true },
   phone: String,
   note: String,
   codes: [codeSchema],
+  payments: [coderPaymentSchema],
 }, { timestamps: true });
 
 coderSchema.index({ createdAt: -1 });

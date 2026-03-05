@@ -2,13 +2,14 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Tabs, Table, Button, Modal, Form, Input, InputNumber, DatePicker, Select,
-  AutoComplete, Radio, message, Tag, Space, Popconfirm, Typography, Empty, Divider, Checkbox,
+  AutoComplete, Radio, message, Tag, Space, Popconfirm, Typography, Empty, Divider, Checkbox, Popover,
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, MinusCircleOutlined } from '@ant-design/icons';
 import {
   getCoders, createCoder, updateCoder, deleteCoder, getCoderCodes,
   addCoderCode, removeCoderCode, assignCoderCode,
   createWagon, createDelivery, getCustomers, createCustomer, getSuppliers,
+  getCoderDebt, addCoderPayment, deleteCoderPayment,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 
@@ -34,6 +35,10 @@ export default function Coders() {
   // Add code modal state
   const [addCodeModal, setAddCodeModal] = useState(false);
   const [addCodeForm] = Form.useForm();
+
+  // Payment modal state
+  const [payModal, setPayModal] = useState(false);
+  const [payForm] = Form.useForm();
 
   // Wagon state
   const [wagonType, setWagonType] = useState('vagon');
@@ -72,6 +77,12 @@ export default function Coders() {
     enabled: !!selectedCoderId,
   });
 
+  const { data: debtData } = useQuery({
+    queryKey: ['coder-debt', selectedCoderId],
+    queryFn: () => getCoderDebt(selectedCoderId),
+    enabled: !!selectedCoderId,
+  });
+
   // Get inventory codes from currentCoder
   const inventoryCodes = currentCoder?.codes || [];
   const availableCodes = inventoryCodes.filter(c => c.status === 'mavjud');
@@ -79,6 +90,7 @@ export default function Coders() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['coders'] });
     queryClient.invalidateQueries({ queryKey: ['coder-codes'] });
+    queryClient.invalidateQueries({ queryKey: ['coder-debt'] });
   };
 
   const createCoderMut = useMutation({
@@ -125,9 +137,9 @@ export default function Coders() {
       const { _selectedCodeIds, ...dlvData } = data;
       const delivery = await createDelivery(dlvData);
       // Assign selected codes
-      if (_selectedCodeIds?.length && dlvData.coder) {
+      if (_selectedCodeIds?.length && selectedCoderId) {
         await Promise.all(_selectedCodeIds.map(codeId =>
-          assignCoderCode(dlvData.coder, codeId, { assignedTo: delivery._id, assignedModel: 'Delivery' })
+          assignCoderCode(selectedCoderId, codeId, { assignedTo: delivery._id, assignedModel: 'Delivery' })
         ));
       }
       return delivery;
@@ -153,6 +165,16 @@ export default function Coders() {
   const removeCodeMut = useMutation({
     mutationFn: (codeId) => removeCoderCode(selectedCoderId, codeId),
     onSuccess: () => { invalidate(); message.success('Kod o\'chirildi'); },
+  });
+
+  const addPaymentMut = useMutation({
+    mutationFn: (data) => addCoderPayment(selectedCoderId, data),
+    onSuccess: () => { invalidate(); message.success("To'lov qo'shildi"); setPayModal(false); payForm.resetFields(); },
+  });
+
+  const deletePaymentMut = useMutation({
+    mutationFn: (paymentId) => deleteCoderPayment(selectedCoderId, paymentId),
+    onSuccess: () => { invalidate(); message.success("To'lov o'chirildi"); },
   });
 
   // Coder modal handlers
@@ -229,7 +251,8 @@ export default function Coders() {
       customer: wagonCustomer || undefined,
       sentDate: wagonSentDate?.toISOString() || null,
       woodBundles: bundles.filter(b => b.thickness && b.width && b.length && b.count),
-      coder: selectedCoderId,
+      coderUZ: selectedCoderId,
+      coderKZ: selectedCoderId,
     });
   };
 
@@ -274,7 +297,9 @@ export default function Coders() {
       avgCost: avgSel?.costPrice || undefined,
       avgExpense: avgSel?.sellPrice || undefined,
       prastoy: dlvPrastoy || undefined,
-      coder: selectedCoderId,
+      uzCoder: uzSel ? selectedCoderId : undefined,
+      kzCoder: kzSel ? selectedCoderId : undefined,
+      avgCoder: avgSel ? selectedCoderId : undefined,
       _selectedCodeIds: dlvSelectedCodes,
     });
   };
@@ -424,6 +449,67 @@ export default function Coders() {
                   />
                 ),
               },
+              {
+                key: 'debt',
+                label: `Qarz (${debtData ? formatMoney(debtData.remainingDebt) : '...'})`,
+                children: debtData ? (
+                  <div>
+                    <Space style={{ marginBottom: 12 }}>
+                      <Tag color="red">Jami qarz: {formatMoney(debtData.totalDebt)}</Tag>
+                      <Tag color="green">To'langan: {formatMoney(debtData.paidAmount)}</Tag>
+                      <Tag color={debtData.remainingDebt > 0 ? 'orange' : 'green'}>Qoldiq: {formatMoney(debtData.remainingDebt)}</Tag>
+                      {debtData.remainingDebt > 0 && (
+                        <Button type="primary" size="small" icon={<PlusOutlined />}
+                          onClick={() => { payForm.resetFields(); payForm.setFieldsValue({ amount: debtData.remainingDebt }); setPayModal(true); }}>
+                          To'lash
+                        </Button>
+                      )}
+                    </Space>
+
+                    <Divider titlePlacement="left" style={{ margin: '8px 0' }}>Qarz tafsiloti</Divider>
+                    <Table size="small" pagination={false} rowKey={(r, i) => `${r.type}-${r._id}-${r.codeType}-${i}`}
+                      dataSource={debtData.details}
+                      columns={[
+                        { title: 'Turi', dataIndex: 'type', width: 80, render: (t) => <Tag color={t === 'wagon' ? 'blue' : 'purple'}>{t === 'wagon' ? 'Vagon' : 'Delivery'}</Tag> },
+                        { title: 'Vagon', dataIndex: 'wagonCode', width: 120 },
+                        { title: 'Kod', width: 100, render: (_, r) => (
+                          <><Tag color={CODE_TYPE_COLOR[r.codeType]}>{r.codeType}</Tag>{r.codeName && <Text type="secondary">{r.codeName}</Text>}</>
+                        )},
+                        { title: 'Narx', width: 80, render: (_, r) => r.rate != null ? `$${r.rate}/t` : '-' },
+                        { title: 'Tonna', dataIndex: 'weight', width: 70, render: (v) => v != null ? `${v} t` : '-' },
+                        { title: 'Summa', dataIndex: 'amount', width: 100, render: (v) => <Text strong>{formatMoney(v)}</Text> },
+                        { title: 'Sana', dataIndex: 'date', width: 100, render: (d) => d ? formatDate(d) : '-' },
+                      ]}
+                      summary={() => debtData.details.length > 0 ? (
+                        <Table.Summary.Row>
+                          <Table.Summary.Cell colSpan={5} index={0}><Text strong>Jami</Text></Table.Summary.Cell>
+                          <Table.Summary.Cell index={5}><Text strong>{formatMoney(debtData.totalDebt)}</Text></Table.Summary.Cell>
+                          <Table.Summary.Cell index={6} />
+                        </Table.Summary.Row>
+                      ) : null}
+                    />
+
+                    {debtData.payments.length > 0 && (
+                      <>
+                        <Divider titlePlacement="left" style={{ margin: '8px 0' }}>To'lovlar tarixi</Divider>
+                        <Table size="small" pagination={false} rowKey="_id"
+                          dataSource={debtData.payments}
+                          columns={[
+                            { title: 'Sana', dataIndex: 'date', width: 120, render: (d) => formatDate(d) },
+                            { title: 'Summa', dataIndex: 'amount', width: 120, render: (v) => formatMoney(v) },
+                            { title: 'Izoh', dataIndex: 'note' },
+                            { title: '', width: 50, render: (_, r) => (
+                              <Popconfirm title="To'lovni o'chirish?" onConfirm={() => deletePaymentMut.mutate(r._id)}>
+                                <Button size="small" danger icon={<DeleteOutlined />} type="text" />
+                              </Popconfirm>
+                            )},
+                          ]}
+                        />
+                      </>
+                    )}
+                  </div>
+                ) : null,
+              },
             ]}
           />
         </div>
@@ -484,6 +570,28 @@ export default function Coders() {
               { label: 'USD', value: 'USD' },
               { label: 'RUB', value: 'RUB' },
             ]} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Payment modal */}
+      <Modal
+        title="To'lov qo'shish"
+        open={payModal}
+        onOk={() => payForm.validateFields().then(v => addPaymentMut.mutate(v))}
+        onCancel={() => setPayModal(false)}
+        confirmLoading={addPaymentMut.isPending}
+        okText="To'lash" cancelText="Bekor"
+      >
+        <Form form={payForm} layout="vertical" style={{ marginTop: 16 }}>
+          <Form.Item name="amount" label="Summa (USD)" rules={[{ required: true, message: 'Summani kiriting' }]}>
+            <InputNumber style={{ width: '100%' }} min={0.01} placeholder="0" />
+          </Form.Item>
+          <Form.Item name="date" label="Sana">
+            <DatePicker style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="note" label="Izoh">
+            <Input placeholder="Izoh" />
           </Form.Item>
         </Form>
       </Modal>

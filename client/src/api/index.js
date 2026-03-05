@@ -189,6 +189,12 @@ export const assignCoderCode = (id, codeId, data) =>
   api.put(`/coders/${id}/codes/${codeId}/assign`, data).then((r) => r.data);
 export const releaseCoderCode = (id, codeId) =>
   api.put(`/coders/${id}/codes/${codeId}/release`).then((r) => r.data);
+export const getCoderDebt = (id) =>
+  api.get(`/coders/${id}/debt`).then((r) => r.data);
+export const addCoderPayment = (id, data) =>
+  api.post(`/coders/${id}/payments`, data).then((r) => r.data);
+export const deleteCoderPayment = (id, paymentId) =>
+  api.delete(`/coders/${id}/payments/${paymentId}`).then((r) => r.data);
 
 // Partners
 export const getPartners = () => api.get("/partners").then((r) => r.data);

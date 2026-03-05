@@ -4,6 +4,9 @@ const CashTransaction = require('../models/CashTransaction');
 const populateFields = [
   { path: 'customer', select: 'name phone' },
   { path: 'sender', select: 'name phone' },
+  { path: 'uzCoder', select: 'name' },
+  { path: 'kzCoder', select: 'name' },
+  { path: 'avgCoder', select: 'name' },
 ];
 
 exports.getAll = async (req, res, next) => {

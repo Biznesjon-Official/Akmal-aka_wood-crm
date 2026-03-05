@@ -13,7 +13,7 @@ import {
   markDelivered, addDeliveryPayment, deleteDeliveryPayment,
   addDeliverySupplierPayment, deleteDeliverySupplierPayment,
   addDeliveryExpense, deleteDeliveryExpense,
-  getCustomers, createCustomer, getSuppliers, createSupplier, getWagons, addWagonExpense,
+  getCustomers, createCustomer, getSuppliers, createSupplier, getWagons, addWagonExpense, getCoders,
 } from '../../api';
 import { formatDate, formatMoney } from '../../utils/format';
 import { useLanguage } from '../../context/LanguageContext';
@@ -69,6 +69,7 @@ export default function Deliveries() {
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers });
   const { data: suppliers = [] } = useQuery({ queryKey: ['suppliers'], queryFn: getSuppliers });
   const { data: wagons = [] } = useQuery({ queryKey: ['wagons'], queryFn: () => getWagons() });
+  const { data: coders = [] } = useQuery({ queryKey: ['coders'], queryFn: getCoders });
 
   const customerOptions = customers.map(c => ({ label: c.name, value: c.name, id: c._id }));
 
@@ -163,6 +164,9 @@ export default function Deliveries() {
       wagon: record.wagon?._id || record.wagon || undefined,
       wagonCode: record.wagonCode || '',
       sender: record.sender?._id || record.sender || undefined,
+      uzCoder: record.uzCoder?._id || record.uzCoder || undefined,
+      kzCoder: record.kzCoder?._id || record.kzCoder || undefined,
+      avgCoder: record.avgCoder?._id || record.avgCoder || undefined,
       customerName: custName,
       sentDate: record.sentDate ? dayjs(record.sentDate) : null,
       arrivedDate: record.arrivedDate ? dayjs(record.arrivedDate) : null,
@@ -736,58 +740,76 @@ export default function Deliveries() {
             </Col>
           </Row>
           <Row gutter={8}>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="uzCode" label="UZ kodi" style={{ marginBottom: 8 }}>
                 <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="uzCost" label="UZ tannarx ($/t)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="uzRate" label="UZ sotuv ($/t)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item name="uzCoder" label="UZ kodchi" style={{ marginBottom: 8 }}>
+                <Select allowClear placeholder="Kodchi" size="small" showSearch optionFilterProp="label"
+                  options={coders.map(c => ({ value: c._id, label: c.name }))} />
+              </Form.Item>
+            </Col>
           </Row>
           <Row gutter={8}>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="kzCode" label="KZ kodi" style={{ marginBottom: 8 }}>
                 <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="kzCost" label="KZ tannarx ($/t)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="kzRate" label="KZ sotuv ($/t)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item name="kzCoder" label="KZ kodchi" style={{ marginBottom: 8 }}>
+                <Select allowClear placeholder="Kodchi" size="small" showSearch optionFilterProp="label"
+                  options={coders.map(c => ({ value: c._id, label: c.name }))} />
+              </Form.Item>
+            </Col>
           </Row>
           <Row gutter={8}>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="avgCode" label="AVG kodi" style={{ marginBottom: 8 }}>
                 <Input placeholder="Kod" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="avgCost" label="AVG tannarx ($)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="avgExpense" label="AVG sotuv ($)" style={{ marginBottom: 8 }}>
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>
             </Col>
+            <Col span={6}>
+              <Form.Item name="avgCoder" label="AVG kodchi" style={{ marginBottom: 8 }}>
+                <Select allowClear placeholder="Kodchi" size="small" showSearch optionFilterProp="label"
+                  options={coders.map(c => ({ value: c._id, label: c.name }))} />
+              </Form.Item>
+            </Col>
           </Row>
           <Row gutter={8}>
-            <Col span={8}>
+            <Col span={6}>
               <Form.Item name="prastoy" label="Prastoy ($)">
                 <InputNumber style={{ width: '100%' }} min={0} placeholder="0" size="small" />
               </Form.Item>

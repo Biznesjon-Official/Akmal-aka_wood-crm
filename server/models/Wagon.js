@@ -60,15 +60,28 @@ const wagonSchema = new mongoose.Schema({
   origin: String,
   destination: String,
   supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
-  coder: { type: mongoose.Schema.Types.ObjectId, ref: 'Coder' },
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer' },
   expenses: [expenseSchema],
   exchangeRate: { type: Number, default: 0 },
   costPricePerM3: { type: Number, default: 0 },
   woodBundles: [woodBundleSchema],
   totalM3: { type: Number, default: 0 },
-  tonnage: { type: Number, default: 0 }
-}, { timestamps: true });
+  tonnage: { type: Number, default: 0 },
+  uzCode: String,
+  uzCostPerTon: { type: Number, default: 0 },
+  coderUZ: { type: mongoose.Schema.Types.ObjectId, ref: 'Coder' },
+  kzCode: String,
+  kzCostPerTon: { type: Number, default: 0 },
+  coderKZ: { type: mongoose.Schema.Types.ObjectId, ref: 'Coder' },
+}, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
+
+wagonSchema.virtual('uzCostTotal').get(function () {
+  return (this.uzCostPerTon || 0) * (this.tonnage || 0);
+});
+
+wagonSchema.virtual('kzCostTotal').get(function () {
+  return (this.kzCostPerTon || 0) * (this.tonnage || 0);
+});
 
 wagonSchema.pre('save', async function () {
   // Calculate totalM3
