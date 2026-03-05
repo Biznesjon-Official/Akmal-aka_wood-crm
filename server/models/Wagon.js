@@ -97,10 +97,11 @@ wagonSchema.pre('save', async function () {
     } catch (_) { /* Settings model may not be loaded yet */ }
   }
 
-  // Calculate costPricePerM3: USD expenses + RUB expenses converted to USD
+  // Calculate costPricePerM3: USD expenses + code costs + RUB expenses converted to USD
+  const codeTotal = ((this.uzCostPerTon || 0) * (this.tonnage || 0)) + ((this.kzCostPerTon || 0) * (this.tonnage || 0));
   const usdTotal = this.expenses
     .filter(e => e.currency === 'USD')
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
+    .reduce((sum, e) => sum + (e.amount || 0), 0) + codeTotal;
   const rubTotal = this.expenses
     .filter(e => e.currency === 'RUB')
     .reduce((sum, e) => sum + (e.amount || 0), 0);
@@ -110,7 +111,7 @@ wagonSchema.pre('save', async function () {
 
   // Auto status calculation
   const hasWood = this.woodBundles.length > 0;
-  const hasExpenses = this.expenses.length > 0;
+  const hasExpenses = this.expenses.length > 0 || codeTotal > 0;
   const hasCost = this.costPricePerM3 > 0;
   if (this.status !== 'sotildi' && this.status !== 'omborda') {
     this.status = (hasWood && hasExpenses && hasCost) ? 'faol' : 'kelyapti';

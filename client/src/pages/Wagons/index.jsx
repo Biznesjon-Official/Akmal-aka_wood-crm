@@ -23,7 +23,7 @@ const STATUS_OPTIONS = Object.entries(statusLabels).map(([value, label]) => ({ v
 
 // Fixed expense types that always show (USD) — used only in detail view
 const FIXED_EXPENSES = [
-  'NDS', 'Usluga', "Temir yo'l KZ", "Temir yo'l UZ",
+  'NDS', 'Usluga',
   'Tupik', 'Xrannei', 'Klentga ortish', 'Yerga tushurish',
 ];
 
@@ -305,6 +305,19 @@ function CreateWagonModal({ open, onCancel, onSave, loading, globalRate, transpo
       <Divider titlePlacement="left" style={{ margin: '12px 0 8px' }}>Xarajatlar (USD)</Divider>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
         <tbody>
+          {/* Kod UZ/KZ avtomatik xarajatlar */}
+          {tonnage > 0 && codeUZ > 0 && (
+            <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
+              <td style={{ ...labelS, width: 160 }}>Kod UZ{codeUZName ? ` (${codeUZName})` : ''}</td>
+              <td style={{ ...cellS, fontWeight: 600 }}>{(tonnage * codeUZ).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} $ <Text type="secondary">({codeUZ}$/t × {tonnage}t)</Text></td>
+            </tr>
+          )}
+          {tonnage > 0 && codeKZ > 0 && (
+            <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
+              <td style={{ ...labelS, width: 160 }}>Kod KZ{codeKZName ? ` (${codeKZName})` : ''}</td>
+              <td style={{ ...cellS, fontWeight: 600 }}>{(tonnage * codeKZ).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} $ <Text type="secondary">({codeKZ}$/t × {tonnage}t)</Text></td>
+            </tr>
+          )}
           {FIXED_EXPENSES.map((name) => (
             <tr key={name} style={{ borderBottom: '1px solid #f0f0f0' }}>
               <td style={{ ...labelS, width: 160 }}>{name}</td>
@@ -403,7 +416,8 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
 
   // View mode calculations
   const totalM3 = (wagon.woodBundles || []).reduce((s, b) => s + (b.totalM3 || 0), 0);
-  const usdExp = (wagon.expenses || []).filter((e) => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0);
+  const codeUsdExp = ((wagon.uzCostPerTon || 0) * (wagon.tonnage || 0)) + ((wagon.kzCostPerTon || 0) * (wagon.tonnage || 0));
+  const usdExp = (wagon.expenses || []).filter((e) => e.currency === 'USD').reduce((s, e) => s + (e.amount || 0), 0) + codeUsdExp;
   const rubExp = (wagon.expenses || []).filter((e) => e.currency === 'RUB').reduce((s, e) => s + (e.amount || 0), 0);
   const rate = wagon.exchangeRate || globalRate || 0;
   const rubInUsd = rate > 0 ? rubExp / rate : 0;
@@ -481,6 +495,21 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
               <tr><th style={thS}>Turi</th><th style={{ ...thS, textAlign: 'right', width: 130 }}>Summa</th><th style={{ ...thS, width: 70 }}>Valyuta</th></tr>
             </thead>
             <tbody>
+              {/* Kod UZ/KZ xarajatlari */}
+              {(wagon.uzCostPerTon || 0) > 0 && (wagon.tonnage || 0) > 0 && (
+                <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
+                  <td style={cellS}>Kod UZ{wagon.uzCode ? ` (${wagon.uzCode})` : ''} — {wagon.uzCostPerTon}$/t × {wagon.tonnage}t</td>
+                  <td style={{ ...cellS, textAlign: 'right' }}>{(wagon.uzCostPerTon * wagon.tonnage).toLocaleString('ru-RU')}</td>
+                  <td style={cellS}><Tag color="green">USD</Tag></td>
+                </tr>
+              )}
+              {(wagon.kzCostPerTon || 0) > 0 && (wagon.tonnage || 0) > 0 && (
+                <tr style={{ borderBottom: '1px solid #f0f0f0', background: '#f6ffed' }}>
+                  <td style={cellS}>Kod KZ{wagon.kzCode ? ` (${wagon.kzCode})` : ''} — {wagon.kzCostPerTon}$/t × {wagon.tonnage}t</td>
+                  <td style={{ ...cellS, textAlign: 'right' }}>{(wagon.kzCostPerTon * wagon.tonnage).toLocaleString('ru-RU')}</td>
+                  <td style={cellS}><Tag color="green">USD</Tag></td>
+                </tr>
+              )}
               {(wagon.expenses || []).map((e, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', background: e.currency === 'RUB' ? '#fffbe6' : undefined }}>
                   <td style={cellS}>{e.description}</td>
@@ -488,7 +517,7 @@ function WagonDetailModal({ wagon, open, onClose, onUpdate, onDelete, updating, 
                   <td style={cellS}><Tag color={e.currency === 'RUB' ? 'orange' : 'green'}>{e.currency}</Tag></td>
                 </tr>
               ))}
-              {(wagon.expenses || []).length === 0 && <tr><td colSpan={3} style={{ ...cellS, color: '#999' }}>Xarajatlar kiritilmagan</td></tr>}
+              {(wagon.expenses || []).length === 0 && !(wagon.uzCostPerTon > 0 || wagon.kzCostPerTon > 0) && <tr><td colSpan={3} style={{ ...cellS, color: '#999' }}>Xarajatlar kiritilmagan</td></tr>}
             </tbody>
           </table>
 
